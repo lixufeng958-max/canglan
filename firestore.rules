@@ -1,0 +1,24 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 玩家资料：登录用户可读，只能改自己的
+    match /users/{uid} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+    // 房间：登录用户可读；只有房主能创建；成员可更新（加入、开局）
+    match /rooms/{code} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.resource.data.host == request.auth.uid;
+      allow update: if request.auth != null;
+      // 对局指令：只能以自己的名义发；房主可以代电脑玩家发
+      match /events/{id} {
+        allow read: if request.auth != null;
+        allow create: if request.auth != null && (
+          request.resource.data.by == request.auth.uid ||
+          get(/databases/$(database)/documents/rooms/$(code)).data.host == request.auth.uid);
+        allow update, delete: if false;
+      }
+    }
+  }
+}
