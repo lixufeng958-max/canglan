@@ -11,7 +11,9 @@ const mmss = s => { s = Math.max(0, Math.floor(s)); return String(Math.floor(s /
 const lagOf = net => net.mode === "local" ? 0 : .35;
 const CP_EVERY = 5, CP_KEEP = 80; // 每 5 秒留一个存档点，最多回滚约 6 分钟
 const CATCOL = { econ: "var(--c-econ)", support: "var(--c-support)", scout: "var(--c-scout)", defense: "var(--c-defense)", attack: "var(--c-attack)", disaster: "var(--c-disaster)" };
-const GLYPH = { harvest: "禾", tax: "税", trade: "市", recruit: "兵", pioneer: "拓", scout: "探", wall: "墙", mine: "矿", settle: "田", swift: "疾", rally: "令", ambush: "伏", beacon: "烽", intercept: "截", tame: "驯", hawk: "鹰", spy: "谍", cavalry: "骑", fire: "焚", subvert: "反", flood: "洪", quake: "震", plague: "疫", beasts: "兽", meteor: "陨", golden: "盛", heaven: "天" };
+const GLYPH = { harvest: "禾", tax: "税", trade: "市", recruit: "兵", pioneer: "拓", scout: "探", wall: "墙", mine: "矿", settle: "田", swift: "疾", rally: "令", ambush: "伏", beacon: "烽", intercept: "截", tame: "驯", hawk: "鹰", spy: "谍", cavalry: "骑", fire: "焚", subvert: "反", flood: "洪", quake: "震", plague: "疫", beasts: "兽", meteor: "陨", golden: "盛", heaven: "天",
+  granary: "仓", march: "急", conscript: "征", patrol: "哨", rampart: "垒", decoy: "疑", raid: "掠", rumor: "谣", feast: "犒", ironwall: "壁", stealth: "隐", blockade: "断", storm: "雨", dragon: "龙", locust: "蝗", mandate: "命" };
+const UNIT_STATS = U => `<span class="ustat"><i>攻</i>${U.atk.toFixed(1)}</span><span class="ustat"><i>守</i>${U.def.toFixed(1)}</span><span class="ustat"><i>速</i>${U.speed.toFixed(1)}</span>`;
 const level = xp => Math.floor(Math.sqrt((xp || 0) / 40)) + 1;
 
 let ONLINE = null, LOCAL = new LZNet.LocalNet(), NET = null, G = null;
@@ -132,11 +134,11 @@ function renderRoom(net, room) {
   const mine = room.players.find(p => p.id === net.user.uid), cur = mine && mine.unit;
   const up = $("#rUnits"); up.innerHTML = "";
   UNIT_KEYS.forEach(k => {
-    const U = UNITS[k], b = el(`<button class="unitpick${cur === k ? " on" : ""}" aria-pressed="${cur === k}"><span class="ug">${U.g}</span><b>${U.name}</b><small>${U.tip}</small></button>`);
+    const U = UNITS[k], b = el(`<button class="unitpick${cur === k ? " on" : ""}" aria-pressed="${cur === k}"><span class="ug">${U.g}</span><b>${U.name}</b><small>${U.tip}</small><span class="ustats">${UNIT_STATS(U)}</span></button>`);
     b.onclick = () => net.updateRoom(room.code, r => { const me2 = r.players.find(x => x.id === net.user.uid); if (me2) me2.unit = k; });
     up.append(b);
   });
-  $("#rUnitDesc").innerHTML = cur ? `<b>${UNITS[cur].name}</b>：${UNITS[cur].desc}。只在你的国都训练；别人攻下你的国都，也能训练它。` : "选一个你的特殊兵种（不选就随机）。特殊兵种只能在本国国都训练；攻下别国国都，就能训练那一国的特殊兵种。";
+  $("#rUnitDesc").innerHTML = cur ? `<b>${UNITS[cur].name}</b>：${UNITS[cur].desc}。<br><b style="color:var(--brass)">独门本事</b>：${UNITS[cur].trait}。<br><span class="tip">只在你的国都训练；别人攻下你的国都，也能训练它。</span>` : "选一个你的特殊兵种（不选就随机）。特殊兵种只能在本国国都训练；攻下别国国都，就能训练那一国的特殊兵种。";
   $("#rHost").hidden = !host; $("#rWait").hidden = host;
   $("#rBot").disabled = room.players.length >= 6;
   $("#rBot").onclick = () => net.updateRoom(room.code, r => {
@@ -269,7 +271,7 @@ function fxSounds(now) {
     const key = f.t0 + "|" + f.kind + "|" + f.r + "|" + (f.by || "");
     if (seen.has(key) || now < f.t0) continue; seen.add(key);
     if (f.vis && !f.vis.includes(G.me)) continue;
-    const snd = { battle: "battle", capture: "capture", volley: "volley", train: "train", sacrifice: "capture", massacre: "lose", meteor: "battle", quake: "battle", fire: "battle" }[f.kind];
+    const snd = { battle: "battle", clash: "clash", capture: "capture", volley: "volley", train: "train", sacrifice: "capture", massacre: "lose", meteor: "battle", quake: "battle", fire: "battle" }[f.kind];
     if (snd) AU("play", snd);
   }
 }
@@ -372,8 +374,8 @@ function validFor(tgt) {
   return {};
 }
 function highlight() {
-  const h = { regions: null, armies: null, sel: G.sel };
-  if (G.mode) { const v = G.mode.valid || {}; h.regions = v.regions || null; h.armies = v.armies || null; }
+  const h = { regions: null, armies: null, sel: G.sel, mark: null };
+  if (G.mode) { const v = G.mode.valid || {}; h.regions = v.regions || null; h.armies = v.armies || null; h.mark = G.mode.armyMark || null; }
   return h;
 }
 function setMode(m, text) {
@@ -395,7 +397,7 @@ function onMapTap({ region, poly, army }) {
   if (army != null) return openArmy(army);
   // 保险：刚选完调兵目标、面板却被意外关掉（手机的幽灵点击）→ 再点同一座城直接重开调兵面板
   const lp = G.lastPick;
-  if (lp && performance.now() - lp.at < 2500 && (region === lp.from || region === lp.to) && !document.querySelector(".scrim")) { openTroops(lp.from, lp.to, lp.card, lp.unit); return; }
+  if (lp && performance.now() - lp.at < 2500 && (region === lp.from || region === lp.to) && !document.querySelector(".scrim")) { openTroops(lp.from, lp.to, lp.card, lp.unit, lp.ex); return; }
   G.sel = region;
   if (region == null) { closeSheets(); return; }
   openRegion(region);
@@ -437,7 +439,7 @@ function openRegion(r) {
     let info;
     const Tr = t => TRAITS[t];
     if (own) {
-      const st = [R.wallUntil > s.t ? "城墙中" : "", R.harvestUntil > s.t ? "丰收中" : "", R.floodUntil > s.t ? "洪灾中" : "", R.taxFreeUntil > s.t ? "免税中" : "", R.beacon ? "有烽火" : ""].filter(Boolean).join(" · ");
+      const st = [R.wallUntil > s.t ? "城墙中" : "", R.ironUntil > s.t ? "铁壁中" : "", R.rampart ? "已筑垒" : "", R.decoyUntil > s.t ? "疑兵中" : "", R.harvestUntil > s.t ? "丰收中" : "", R.floodUntil > s.t ? "水患中" : "", R.taxFreeUntil > s.t ? "免税中" : "", R.beacon ? "有烽火" : "", R.patrols.some(q => q.by === me && q.until > s.t) ? "有巡哨" : ""].filter(Boolean).join(" · ");
       const o = s.output(r), pol = R.policy === "home" ? "故土" : POLICY[R.policy].name;
       info = `<div class="tip">${ownerTag(me)} · ${TERR[g.terr].name} · <b>${Tr(R.trait).name}</b>${s.P[me].capital === r ? " · 都城" : ""}${st ? " · " + st : ""}</div>
         <div class="kv"><div><small>居民</small><b class="num">${fmt(R.pop)}</b></div><div><small>民心 · ${loyTxt(R.loyalty)}</small><b class="num" style="color:${R.loyalty < 25 ? "var(--bad)" : R.loyalty < 45 ? "var(--warn)" : "inherit"}">${Math.round(R.loyalty)}</b></div><div><small>守军</small><b class="num">${fmt(s.gar(R))}</b></div><div><small>守备</small><b class="num">×${s.defMult(r).toFixed(2)}</b></div></div>
@@ -496,14 +498,25 @@ function openPolicy(r) {
     };
   });
 }
+const kindName = a => UNITS[a.kind] ? UNITS[a.kind].name : a.kind === "cavalry" ? "铁骑" : a.kind === "stealth" ? "奇袭" : "步军";
 function openArmy(id) {
   const s = G.sim, a = s.armies.find(x => x.id === id); if (!a) return;
-  const own = a.owner === G.me, P = s.P[a.owner], next = s.map.regions[a.path[a.idx + 1]];
+  const own = a.owner === G.me, P = s.P[a.owner], next = s.map.regions[a.path[a.idx + 1]], nextR = s.R[a.path[a.idx + 1]];
   const dest = own ? s.map.regions[a.path[a.path.length - 1]].name : "未知";
-  const body = box(`<div class="tip">${ownerTag(a.owner)} · ${own ? "" : relName[s.relOf(G.me, a.owner)]}</div>
-    <div class="kv"><div><small>兵力</small><b class="num">${fmt(a.troops)}</b></div><div><small>下一站</small><b>${esc(next.name)}</b></div><div><small>目的地</small><b>${esc(dest)}</b></div><div><small>类型</small><b>${UNITS[a.kind] ? UNITS[a.kind].name : a.kind === "cavalry" ? "铁骑" : "步军"}</b></div></div>
-    ${own ? "" : `<div class="tip">看得见它，是因为它正经过你掌控或侦查过的地区。可以用「截杀」卡打击它，或者在它的去路上设「伏兵」。</div>`}`);
-  sheet(own ? "我的军队" : P.name + "的军队", body, { light: true });
+  const ally = !own && s.relOf(G.me, a.owner) === "ally", hunted = own && a.hunt ? s.armies.find(x => x.id === a.hunt) : null;
+  const body = box(`<div class="tip">${ownerTag(a.owner)} · ${own ? (a.hunt ? "正在半路截杀" + (hunted ? esc(s.P[hunted.owner].name) + "的军队" : "") : "") : relName[s.relOf(G.me, a.owner)]}</div>
+    <div class="kv"><div><small>兵力</small><b class="num">${fmt(a.troops)}</b></div><div><small>下一站</small><b>${esc(next.name)}</b></div><div><small>目的地</small><b>${esc(dest)}</b></div><div><small>类型</small><b>${kindName(a)}</b></div></div>
+    ${own || ally ? "" : `<div class="tip">它正沿官道走向<b>${esc(next.name)}</b>${nextR.owner === G.me ? "——<b style='color:var(--bad)'>那是你的城！</b>" : ""}。可以<b>从任意一座城派兵半路截杀</b>：追上就在官道上野战；追不上，部队会去${nextR.owner === G.me ? "帮忙守城" : "你的城里"}（若城已失守就原路返回）。也可以用「截杀」卡，或在去路上设「伏兵」。</div>
+    <div class="acts"><button class="btn" id="aHunt">⚔ 半路截杀</button></div>`}`);
+  const sh = sheet(own ? "我的军队" : P.name + "的军队", body, { light: true });
+  const hb = body.querySelector("#aHunt");
+  if (hb) { if (s.dev()) { hb.disabled = true; hb.textContent = "发育期不能截杀"; } hb.onclick = () => { sh.close(); startHunt(a.id); }; }
+}
+function startHunt(armyId) {
+  const s = G.sim, v = validFor("src");
+  if (!v.regions.length) return toast("你没有能出兵的地区（至少要 2 兵）", "alert");
+  const e = s.armies.find(x => x.id === armyId); if (!e) return;
+  setMode({ valid: v, armyMark: armyId, pick: ({ r }) => { setMode(null); openTroops(r, e.path[e.idx + 1], null, null, { hunt: armyId }); } }, `截杀${s.P[e.owner].name}的军队：点出发的城池`);
 }
 
 /* ---------- 出兵 ---------- */
@@ -515,41 +528,53 @@ function startMoveTo(to) {
   if (!v.regions.length) return toast("你没有能出兵的地区（至少要 2 兵）", "alert");
   setMode({ valid: v, pick: ({ r }) => { setMode(null); openTroops(r, to); } }, `派兵到${G.sim.map.regions[to].name}：点出发地`);
 }
-function eta(from, to, speed = 1, u) {
-  const s = G.sim, p = s.path(from, to); if (!p) return null;
-  let t = 0; for (let k = 0; k < p.length - 1; k++) t += s.segLen(p[k], p[k + 1]) / (LZ.SPEED * speed * (u === "wudang" ? 1 : s.segSpeed(p[k], p[k + 1])));
+function etaPath(p, speed = 1, u) {
+  const s = G.sim; let t = 0;
+  for (let k = 0; k < p.length - 1; k++) t += s.segLen(p[k], p[k + 1]) / (LZ.SPEED * speed * (u === "wudang" ? 1 : s.segSpeed(p[k], p[k + 1])));
   return { secs: t, hops: p.length - 1, path: p };
 }
-function openTroops(from, to, card, unit) {
+function eta(from, to, speed = 1, u) { const p = G.sim.path(from, to); return p ? etaPath(p, speed, u) : null; }
+function openTroops(from, to, card, unit, ex = {}) {
   const s = G.sim, me = G.me, R = s.R[from], T = s.R[to];
-  G.lastPick = { from, to, card, unit, at: performance.now() };
-  // 可选兵种：普通兵 + 本地驻扎的特殊兵（铁骑卡只能用普通兵）
+  const hunt = ex.hunt != null ? s.armies.find(x => x.id === ex.hunt) : null;
+  if (ex.hunt != null && !hunt) return toast("那支军队已经不在路上了", "alert");
+  const cardK = card ? (s.P[me].hand.find(c => c.h === card) || {}).k : null, cardC = cardK ? CARDS[cardK] : null;
+  G.lastPick = { from, to, card, unit, ex, at: performance.now() };
+  // 可选兵种：普通兵 + 本地驻扎的特殊兵（铁骑、奇袭卡只能用普通兵）
   const opts = [];
-  if (Math.floor(R.troops) - 1 >= 1) opts.push({ u: null, name: card ? "铁骑（普通兵）" : "普通兵", max: Math.floor(R.troops) - 1 });
+  if (Math.floor(R.troops) - 1 >= 1) opts.push({ u: null, name: cardC ? cardC.name + "（普通兵）" : "普通兵", max: Math.floor(R.troops) - 1 });
   if (!card) for (const k of UNIT_KEYS) if ((R.el[k] || 0) >= 1) opts.push({ u: k, name: UNITS[k].name, max: R.el[k] });
   if (!opts.length) return toast("兵力不够", "alert");
   let opt = opts.find(o => o.u === (unit || null)) || opts[0];
   const snap = s.P[me].snap[to], vis = s.visible(me, to);
-  const kind = T.owner === me ? "调兵" : T.owner && s.relOf(me, T.owner) === "ally" ? "援军" : "进攻";
-  const devBlock = s.dev() && T.owner && T.owner !== me && s.relOf(me, T.owner) !== "ally";
+  const kind = hunt ? "截杀" : T.owner === me ? "调兵" : T.owner && s.relOf(me, T.owner) === "ally" ? "援军" : "进攻";
+  const devBlock = s.dev() && ((T.owner && T.owner !== me && s.relOf(me, T.owner) !== "ally") || hunt);
   const wrap = document.createElement("div"); wrap.style.display = "contents";
   const draw = () => {
-    const U = UNITS[opt.u], speed = card ? 2 : U ? U.speed : 1, atk = card ? 1.3 : U ? U.atk : 1, max = opt.max;
-    const e = eta(from, to, speed, opt.u);
+    const U = UNITS[opt.u], speed = cardK === "cavalry" ? 2 : U ? U.speed : 1, atk = cardK === "cavalry" ? 1.3 : U ? U.atk : 1, max = opt.max;
+    const plan = hunt ? s.huntPlan(me, from, hunt.id) : null;
+    const e = hunt ? (typeof plan === "string" ? null : etaPath(plan.path, speed, opt.u)) : eta(from, to, speed, opt.u);
+    const head = hunt ? `从 ${esc(s.map.regions[from].name)} 出发，经 <b>${esc(s.map.regions[to].name)}</b> 迎击 <b>${esc(s.P[hunt.owner].name)}</b> 的军队（约 ${fmt(hunt.troops)} ${kindName(hunt)}）· 约 <b>${e ? mmss(e.secs) : "?"}</b> 赶到那条官道${typeof plan === "string" ? `<br><span style="color:var(--bad)">${plan}</span>` : ""}`
+      : `${esc(s.map.regions[from].name)} → <b>${esc(s.map.regions[to].name)}</b>（${kind}${cardC ? " · " + cardC.name : U ? " · " + U.name : ""}）· 途经 ${e ? e.hops : "?"} 个地区，约 <b>${e ? mmss(e.secs) : "?"}</b> 到达`;
     const body = box(`${opts.length > 1 ? `<div class="seg unitseg">${opts.map((o, i) => `<button data-i="${i}" aria-pressed="${o === opt}">${o.u ? `<i>${UNITS[o.u].g}</i>` : ""}${o.name} <small class="num">${fmt(o.max)}</small></button>`).join("")}</div>` : ""}
-      <div class="tip">${esc(s.map.regions[from].name)} → <b>${esc(s.map.regions[to].name)}</b>（${kind}${card ? " · 铁骑" : U ? " · " + U.name : ""}）· 途经 ${e ? e.hops : "?"} 个地区，约 <b>${e ? mmss(e.secs) : "?"}</b> 到达</div>
-      ${U ? `<div class="tip elitetip"><b>${U.name}</b>：${U.desc}</div>` : ""}
+      <div class="tip">${head}</div>
+      ${U ? `<div class="tip elitetip"><b>${U.name}</b>：${U.desc}。<b>${U.trait}</b></div>` : ""}
       <div class="mv-n num" id="tN"></div>
       <input type="range" class="range" id="tR" min="1" max="${max}" value="${U ? max : Math.max(1, Math.round(max * .75))}" aria-label="兵力">
       <div class="tip" style="display:flex;justify-content:space-between"><span>留守 <b class="num" id="tL"></b></span><span>可用 ${fmt(max)}</span></div>
       <div class="card tip" id="tOdds"></div>
       ${devBlock ? `<p class="err">发育期内不能进攻其他玩家</p>` : ""}
-      <button class="btn block" id="tGo">${kind === "进攻" ? "出征！" : "出发"}</button>`);
+      <button class="btn block" id="tGo">${kind === "进攻" ? "出征！" : kind === "截杀" ? "截杀！" : "出发"}</button>`);
     body.querySelectorAll(".unitseg button").forEach(b => b.onclick = () => { opt = opts[+b.dataset.i]; wrap.innerHTML = ""; wrap.append(draw()); });
     const rg = body.querySelector("#tR");
     const upd = () => {
       const n = +rg.value; body.querySelector("#tN").textContent = fmt(n) + (U ? " " + U.name : " 兵"); body.querySelector("#tL").textContent = U ? fmt((R.el[opt.u] || 0) - n) + " " + U.name : fmt(R.troops - n);
       const o = body.querySelector("#tOdds");
+      if (hunt) {
+        const mine = n * atk * (opt.u === "hubao" ? 1.25 : 1), theirs = hunt.troops * hunt.atk * (hunt.kind === "hubao" ? 1.25 : 1), ratio = mine / Math.max(1, theirs);
+        const [lab, col] = ratio > 1.4 ? ["追上必胜", "var(--good)"] : ratio > 1.1 ? ["胜算较大", "var(--good)"] : ratio > .9 ? ["五五开", "var(--warn)"] : ["胜算很小", "var(--bad)"];
+        o.innerHTML = `野战：我方 ${fmt(n)}×${atk.toFixed(1)} 对 敌军 ${fmt(hunt.troops)}×${hunt.atk.toFixed(1)} → <b style="color:${col}">${lab}</b><br>敌军先到${esc(s.map.regions[to].name)}的话就追不上：城没丢，部队去助守；城丢了就回家。`; return;
+      }
       if (kind !== "进攻") { o.textContent = kind === "援军" ? "援军会并入盟友的守军。" : "部队会并入目标地区的守军。"; return; }
       if (!vis || !snap) { o.innerHTML = "目标在迷雾中，<b>不知道有多少守军或凶兽</b>。先侦查更稳妥。"; return; }
       let gd = snap.owner ? snap.troops : 0;
@@ -562,8 +587,9 @@ function openTroops(from, to, card, unit) {
     rg.oninput = upd; upd();
     body.querySelector("#tGo").disabled = devBlock;
     body.querySelector("#tGo").onclick = () => {
-      if (card) send("card", { h: card, from, to, n: +rg.value }); else send("move", opt.u ? { from, to, n: +rg.value, u: opt.u } : { from, to, n: +rg.value });
-      G.lastPick = null; sh.close(); toast("命令已下达", "good");
+      if (card) send("card", { h: card, from, to, n: +rg.value });
+      else { const a = { from, to, n: +rg.value }; if (opt.u) a.u = opt.u; if (hunt) { a.hunt = hunt.id; delete a.to; } send("move", a); }
+      G.lastPick = null; sh.close(); toast(hunt ? "截杀部队已出发" : "命令已下达", "good");
     };
     return body;
   };
@@ -632,7 +658,7 @@ function openCard(c) {
 }
 function tgtText(t) {
   return { own: "目标：你自己的一个地区", any: "目标：地图上任意地区（迷雾中也可以）", vis: "目标：你看得见的地区", enemy: "目标：你看得见的、非盟友的他人地区", pioneer: "目标：与你相邻的无主地区", beast: "目标：与你相邻、侦查到有凶兽的地区",
-    player: "目标：另一名玩家", myArmy: "目标：你正在行进的军队", army: "目标：你看得见的他人军队（在你掌控或侦查过的地区里）", none: "无需目标，立即生效", launch: "先选出发地，再选目标，再定兵力" }[t] || "";
+    player: "目标：另一名玩家", myArmy: "目标：你正在行进的军队", army: "目标：你看得见的他人军队（在你掌控、侦查或巡哨过的地区里）", none: "无需目标，立即生效", launch: "先选出发地，再选目标，再定兵力" }[t] || "";
 }
 function useCard(c) {
   const C = CARDS[c.k], s = G.sim;
@@ -647,8 +673,8 @@ function useCard(c) {
   if (C.tgt === "launch") {
     const v = validFor("src"); if (!v.regions.length) return toast("没有能出兵的地区", "alert");
     setMode({ valid: v, pick: ({ r: from }) => {
-      setMode({ valid: { regions: s.R.map((x, i) => i).filter(i => i !== from) }, pick: ({ r: to }) => { setMode(null); openTroops(from, to, c.h); } }, "铁骑：点目标地区");
-    } }, "铁骑：点出发地（你的地区）");
+      setMode({ valid: { regions: s.R.map((x, i) => i).filter(i => i !== from) }, pick: ({ r: to }) => { setMode(null); openTroops(from, to, c.h); } }, `${C.name}：点目标地区`);
+    } }, `${C.name}：点出发地（你的地区）`);
     return;
   }
   const v = validFor(C.tgt);
@@ -843,9 +869,11 @@ function openHelp() {
     <h4>民心</h4><p>民心低于 25 而守军不足时，城池会叛乱独立。粮食耗尽、横征暴敛、屠城、献祭都会伤民心。</p>
     <h4>攻下城池后</h4><p>要决定如何处置百姓：<b>待民如子</b>（花粮赈济，民心高、人口涨、名望升）、<b>军管</b>（不赏不罚）、<b>横征暴敛</b>（立刻搜刮一笔、此后多收金，但百姓逃散、易叛乱）、<b>屠城</b>（劫掠大量金粮，但城池荒芜、天下震动）。</p>
     <h4>名望</h4><p>名望高（≥10）时，邻近敌城里民心低、守军少的百姓会举城来投。名望低（≤−10）时，敌人会拼死守城（守备 ×1.2），你新占的城民心更低。</p>
-    <h4>卡牌</h4><p>分四等：凡品、良品、珍品、传说。<b>自动发放</b>：开局 ${DRAW.startCards} 张，之后每 ${DRAW.dealEvery} 秒发一张，${DRAW.pity} 张内保底珍品，不用你操作。<b>市集</b>只卖凡品，而且很贵。想指定拿高级卡，只能上<b>祭坛</b>：献祭一支军队（${SAC.army.troops} 兵）换良品，献祭一城六成居民换珍品，自毁一座城池换传说。</p>
-    <h4>特殊兵种</h4><p>开局前每人挑一种。<b>国都只产特殊兵种、不产普通兵</b>：每 ${LZ.ELITE_GROW} 秒自动 +1（上限随人口增长），也可以花钱立刻训练（每次 +${TRAIN.n}，${TRAIN.gold} 金 ${TRAIN.food} 粮 ${TRAIN.pop} 民）。普通兵由其他城池产出和征召。攻下别国国都，就能在那里训练那一国的特殊兵种。出兵时可以选派普通兵或特殊兵。${UNIT_KEYS.map(k => `<br>· <b>${UNITS[k].name}</b>：${UNITS[k].desc}`).join("")}</p>
-    <h4>地形与官道</h4><p>城池之间有官道相连，军队沿官道行军，会绕开高山、在桥上过河。山地、森林、沼泽行军较慢，守城更有利。</p>
+    <h4>卡牌</h4><p>分四等：凡品、良品、珍品、传说。<b>自动发放</b>：开局 ${DRAW.startCards} 张，之后每 ${DRAW.dealEvery} 秒发一张，${DRAW.pity} 张内保底珍品，不用你操作。<b>市集</b>只卖凡品，而且很贵。想指定拿高级卡，只能上<b>祭坛</b>：献祭一支军队（${SAC.army.troops} 兵）换良品，献祭一城六成居民换珍品，自毁一座城池换传说。共 ${Object.keys(CARDS).length} 种牌：${[1, 2, 3, 4].map(t => `<b>${TIERS[t].name}</b> ${Object.keys(CARDS).filter(k => CARDS[k].tier === t).map(k => CARDS[k].name).join("、")}`).join("；")}。</p>
+    <h4>特殊兵种</h4><p>开局前每人挑一种。<b>国都只产特殊兵种、不产普通兵</b>：每 ${LZ.ELITE_GROW} 秒自动 +1（上限随人口增长），也可以花钱立刻训练（每次 +${TRAIN.n}，${TRAIN.gold} 金 ${TRAIN.food} 粮 ${TRAIN.pop} 民）。普通兵由其他城池产出和征召。攻下别国国都，就能在那里训练那一国的特殊兵种。出兵时可以选派普通兵或特殊兵。${UNIT_KEYS.map(k => `<br>· <b>${UNITS[k].name}</b>（攻 ${UNITS[k].atk} 守 ${UNITS[k].def} 速 ${UNITS[k].speed}）：${UNITS[k].desc}。<b>${UNITS[k].trait}</b>`).join("")}</p>
+    <h4>半路截杀</h4><p>看见一支敌军（它正经过你掌控、侦查或巡哨过的地区）时，点它→「半路截杀」→选一座你的城出兵。截杀部队会先赶到敌军的下一站，再迎着它走上那条官道：<b>追上了就在官道上野战</b>（兵力×进攻力大的赢，败方全军覆没）。<b>追不上</b>（敌军先到了）：目标城还在你手里就进城助守，已经失守就原路回家。虎豹骑追击范围加倍，无当飞军最难被追上。</p>
+    <h4>地形与官道</h4><p>城池之间有官道相连，军队沿官道行军，会绕开高山、在桥上过河。山地、森林、沼泽行军较慢，守城更有利。地图上看得出来：深绿是森林，褐色带雪顶的是山地，暗绿泛水的是沼泽，黄绿色是平原。</p>
+    <h4>城池看得出贫富</h4><p>富庶之城屋顶金黄、楼阁林立；丰饶之城四周良田；尚武之城高墙箭楼、红旗猎猎；贫瘠之地只有几间破屋；要塞是石砌关隘；国都有宫殿。人口越多，城池越大。</p>
     <h4>天时</h4><p>每隔两分钟左右会有随机事件：有的天下皆受（丰年、大旱、商路大开、大雾、瘟疫、兽群迁徙、天降祥瑞），有的只落在一位玩家头上（流民、豪杰、金矿、商人、甘霖，或粮仓失火、地方生乱、时疫、盗匪、将领叛逃）。福事多半眷顾最弱的一方，祸事多半找上最强的一方。大雾期间只看得见自家地界里的军队，正好偷袭。</p>
     <h4>发育期</h4><p>开局几分钟不能进攻其他玩家，只能用收益、辅助类卡牌。抓紧打凶兽、扩张、发展人口。</p>
     <h4>迷雾与侦查</h4><p>你只能看清自己的领地。侦查过的地区能看到居民、民风、民心、守军，并且此后经过那里的军队都看得见：可以提前布防、设伏、截杀，或提醒盟友。</p>

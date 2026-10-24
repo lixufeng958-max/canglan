@@ -37,7 +37,24 @@ const ICONS = {
   quake: `<g ${S}><path d="M4 32h10l4-10 6 20 6-16 4 8h10"/><path d="M8 42h32"/><path d="M14 14l4 4-2 4M30 10l-3 5 4 3"/></g><path d="M22 12l2-4 2 4-2 3z" ${F}/>`,
   plague: `<g ${S}><path d="M14 30c-2-10 4-18 10-18s12 8 10 18c-1 4-4 6-10 6s-9-2-10-6z"/><path d="M18 36v6M24 36v6M30 36v6"/></g><circle cx="19" cy="24" r="3" ${F}/><circle cx="29" cy="24" r="3" ${F}/><path d="M22 30h4l-2 3z" ${F}/>`,
   beasts: `<g ${S}><path d="M10 38c-4-6-2-14 4-16 2 4 4 6 8 6s6-2 8-6c6 2 8 10 4 16"/><path d="M12 38h24"/></g><path d="M14 22c-2-4-1-8 2-10 1 3 2 5 4 6zM34 22c2-4 1-8-2-10-1 3-2 5-4 6z" ${F}/><circle cx="19" cy="30" r="2" ${F}/><circle cx="29" cy="30" r="2" ${F}/>`,
-  meteor: `<g ${S}><path d="M42 6L22 26"/><path d="M40 12L26 26M34 6L22 18"/><circle cx="18" cy="30" r="8"/><path d="M6 44c4-2 8-2 12 0"/></g><circle cx="18" cy="30" r="4" ${F}/>`
+  meteor: `<g ${S}><path d="M42 6L22 26"/><path d="M40 12L26 26M34 6L22 18"/><circle cx="18" cy="30" r="8"/><path d="M6 44c4-2 8-2 12 0"/></g><circle cx="18" cy="30" r="4" ${F}/>`,
+  // 新增
+  granary: `<g ${S}><path d="M10 42V20l14-10 14 10v22"/><path d="M6 42h36"/><path d="M16 42V30h16v12"/><path d="M10 26h28"/></g><rect x="20" y="33" width="8" height="9" ${F}/>`,
+  march: `<g ${S}><path d="M14 40l6-16 6 6 4-10 6 20"/><path d="M4 18h10M4 26h8M4 34h6"/><path d="M30 10l8 2-6 5z"/></g><circle cx="20" cy="24" r="2" ${F}/><circle cx="30" cy="20" r="2" ${F}/>`,
+  conscript: `<g ${S}><path d="M10 42V18l5-5 5 5v24M20 42V22l5-5 5 5v20M30 42V18l5-5 5 5v24"/><path d="M6 42h36"/><path d="M8 10h32"/></g><path d="M22 6l4 4-4 4-4-4z" ${F}/>`,
+  patrol: `<g ${S}><path d="M8 38c0-8 4-14 10-16l4-6 2 2 4-4 2 6c4 2 6 6 6 12"/><path d="M12 38l2-6M30 38l-2-6"/><circle cx="36" cy="14" r="6"/><path d="M36 8v-4M42 14h4"/></g><circle cx="36" cy="14" r="2.5" ${F}/>`,
+  rampart: `<g ${S}><path d="M6 42l6-16h24l6 16"/><path d="M4 42h40"/><path d="M12 26v-6h5v6M22 26v-6h5v6M31 26v-6h5v6"/><path d="M10 34h28"/></g><rect x="21" y="32" width="6" height="10" ${F}/>`,
+  decoy: `<g ${S}><path d="M14 42V12"/><path d="M14 14h18l-4 6 4 6H14"/><path d="M30 42V22"/><path d="M30 24h12l-3 5 3 5H30" stroke-dasharray="3 3"/><path d="M8 42h28"/></g><path d="M17 17h10l-2 3 2 3H17z" ${F}/>`,
+  raid: `<g ${S}><path d="M8 40l12-12M12 44l12-12"/><path d="M20 28l-6-6 4-4 6 6"/><path d="M26 10c6-2 12 2 14 8-6 2-12-2-14-8z"/><path d="M30 18l6 14"/></g><circle cx="36" cy="36" r="4" ${F}/><circle cx="28" cy="40" r="2.5" ${F}/>`,
+  rumor: `<g ${S}><path d="M8 20c0-6 6-10 14-10s14 4 14 10-6 10-14 10l-6 6v-7c-5-2-8-5-8-9z"/><path d="M26 30c6 0 12 3 12 8s-4 7-8 7l-2 3v-4c-3-1-5-3-5-6"/></g><circle cx="16" cy="20" r="2" ${F}/><circle cx="22" cy="20" r="2" ${F}/><circle cx="28" cy="20" r="2" ${F}/>`,
+  feast: `<g ${S}><path d="M10 30c0 8 6 12 14 12s14-4 14-12z"/><path d="M8 30h32"/><path d="M14 22l4-8M24 20v-10M34 22l-4-8"/><path d="M16 42h16"/></g><circle cx="18" cy="14" r="2.5" ${F}/><circle cx="24" cy="10" r="2.5" ${F}/><circle cx="30" cy="14" r="2.5" ${F}/>`,
+  ironwall: `<g ${S}><path d="M8 42V14h32v28"/><path d="M4 42h40"/><path d="M8 14l4-6h24l4 6"/><path d="M8 24h32M8 34h32"/><path d="M18 14v10M28 24v10M18 34v8"/></g><rect x="20" y="4" width="8" height="6" ${F}/>`,
+  stealth: `<g ${S}><path d="M10 40c0-12 6-20 14-20s14 8 14 20"/><path d="M8 40h32"/><path d="M16 22c0-6 3-10 8-10s8 4 8 10"/><path d="M4 30c4-4 8-4 12 0M32 30c4-4 8-4 12 0" stroke-dasharray="2 3"/></g><circle cx="20" cy="30" r="2" ${F}/><circle cx="28" cy="30" r="2" ${F}/>`,
+  blockade: `<g ${S}><path d="M6 36c6-4 10-4 16 0s10 4 16 0"/><path d="M12 14l4 16M36 14l-4 16"/><path d="M14 18h20"/><path d="M8 8l32 32"/></g><rect x="20" y="20" width="8" height="8" ${F}/>`,
+  storm: `<g ${S}><path d="M10 22c-4 0-6-3-6-6 0-4 3-7 7-7 1-5 5-7 9-7 5 0 8 3 9 7 5 0 9 3 9 7s-3 6-7 6z"/><path d="M12 30l-3 6M20 30l-3 6M28 30l-3 6M36 30l-3 6"/><path d="M16 40l-2 4M26 40l-2 4"/></g><path d="M28 24l-6 8h5l-3 8 8-10h-5z" ${F}/>`,
+  dragon: `<g ${S}><path d="M6 30c4-10 10-14 18-12 6 2 8 8 14 6 4-1 6-5 6-10"/><path d="M8 34c6 2 12 2 16-2"/><path d="M34 14l6-6M38 14l4 2"/><path d="M14 20l-2-6M22 18l1-6"/></g><circle cx="36" cy="18" r="2.5" ${F}/><path d="M26 22c4-2 8 0 10 4-4 2-8 0-10-4z" ${F}/>`,
+  locust: `<g ${S}><path d="M10 30c4-6 10-8 16-6 4 2 6 6 10 6"/><path d="M14 24c-2-6 0-10 4-12M22 22c0-6 3-9 7-10"/><path d="M12 36l-4 6M20 36l-2 8M30 34l4 8"/><path d="M34 26l8-4"/></g><circle cx="38" cy="28" r="2.5" ${F}/><circle cx="12" cy="16" r="2" ${F}/><circle cx="30" cy="8" r="2" ${F}/>`,
+  mandate: `<g ${S}><path d="M24 6v8M14 10l4 6M34 10l-4 6"/><path d="M10 42V24h28v18"/><path d="M6 42h36"/><path d="M14 24l10-8 10 8"/></g><circle cx="24" cy="32" r="4" ${F}/><path d="M22 14l2-6 2 6z" ${F}/>`
 };
 root.LZIcons = ICONS;
 root.LZIcon = k => ICONS[k] ? `<svg class="ci" viewBox="0 0 48 48" aria-hidden="true">${ICONS[k]}</svg>` : "";

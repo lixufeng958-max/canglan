@@ -50,6 +50,10 @@ const TIERS = { 1: { name: "凡品", col: "#B9B2A3" }, 2: { name: "良品", col:
 const CARDS = {
   // 凡品
   harvest:  { tier: 1, name: "丰收", cat: "econ", tgt: "own", price: { gold: 70 }, desc: "一个己方地区 2.5 分钟内粮食产量翻倍" },
+  granary:  { tier: 1, name: "屯粮", cat: "econ", tgt: "none", price: { gold: 60 }, desc: "开仓运粮：立刻 +120 粮" },
+  march:    { tier: 1, name: "急行军", cat: "support", tgt: "myArmy", price: { gold: 45, food: 30 }, desc: "一支己方行进中的军队速度 ×1.5" },
+  conscript:{ tier: 1, name: "强征", cat: "support", tgt: "own", price: { gold: 30 }, desc: "一个己方地区立刻 +40 兵，但居民 −600、民心 −10" },
+  patrol:   { tier: 1, name: "巡哨", cat: "scout", tgt: "own", price: { gold: 40 }, desc: "派出游骑：3 分钟内，经过该地区及其相邻地区的一切军队都看得见" },
   tax:      { tier: 1, name: "征税", cat: "econ", tgt: "none", price: { food: 80 }, desc: "立刻收取 全国居民每千人 8 金，但各地民心 −5" },
   trade:    { tier: 1, name: "互市", cat: "econ", tgt: "none", price: { gold: 55 }, desc: "用 60 粮换 100 金" },
   recruit:  { tier: 1, name: "募兵", cat: "support", tgt: "own", price: { gold: 60, food: 40 }, desc: "一个己方地区立刻 +25 兵" },
@@ -64,6 +68,11 @@ const CARDS = {
   ambush:   { tier: 2, name: "伏兵", cat: "defense", tgt: "vis", desc: "在看得见的地区埋伏 3 分钟，劫杀经过的敌军（威力 40）" },
   beacon:   { tier: 2, name: "烽火", cat: "defense", tgt: "own", desc: "在己方地区点烽火，永久看清两圈内的动静" },
   intercept:{ tier: 2, name: "截杀", cat: "attack", tgt: "army", desc: "截击一支看得见的他人军队，歼灭 40%" },
+  rampart:  { tier: 2, name: "筑垒", cat: "defense", tgt: "own", desc: "一个己方地区永久守备 ×1.2（每地一次）" },
+  decoy:    { tier: 2, name: "疑兵", cat: "defense", tgt: "own", desc: "虚张声势：3 分钟内，别人侦查到的该地守军数是真实的 3 倍" },
+  raid:     { tier: 2, name: "劫掠", cat: "attack", tgt: "enemy", desc: "洗劫看得见的敌方地区：抢走 每千人 20 金 15 粮，该地民心 −10" },
+  rumor:    { tier: 2, name: "流言", cat: "attack", tgt: "enemy", desc: "散布流言：看得见的敌方地区民心 −20，居民 −5%" },
+  feast:    { tier: 2, name: "犒军", cat: "econ", tgt: "none", desc: "大赏三军：你所有地区民心 +12，各地守军 +3" },
   // 珍品
   tame:     { tier: 3, name: "驯兽", cat: "support", tgt: "beast", desc: "收服相邻地区的凶兽，连地带兽一起归你" },
   hawk:     { tier: 3, name: "鹰眼", cat: "scout", tgt: "any", desc: "侦查两圈范围内的所有地区" },
@@ -72,13 +81,20 @@ const CARDS = {
   fire:     { tier: 3, name: "火攻", cat: "attack", tgt: "enemy", desc: "烧掉看得见的敌方地区 35% 守军和 10% 居民" },
   subvert:  { tier: 3, name: "策反", cat: "attack", tgt: "enemy", desc: "煽动看得见的敌方地区：民心低于 50 且守军不足 20 时直接倒戈归你；否则民心 −30" },
   flood:    { tier: 3, name: "洪水", cat: "disaster", tgt: "any", desc: "2.5 分钟内该地区不产出、军队行进减半，守军 −15%，居民 −10%" },
+  ironwall: { tier: 3, name: "铁壁", cat: "defense", tgt: "own", desc: "一个己方地区 3 分钟内守备 ×2.2，且免疫火攻" },
+  stealth:  { tier: 3, name: "奇袭", cat: "attack", tgt: "launch", desc: "派一支隐形部队：3 分钟内任何人都看不见它（决战期除外）" },
+  blockade: { tier: 3, name: "断粮", cat: "attack", tgt: "player", desc: "切断一名玩家的粮道：2 分钟内他的粮食产出减半" },
+  storm:    { tier: 3, name: "暴雨", cat: "disaster", tgt: "any", desc: "目标及相邻地区 2 分钟内不产出、军队行进减半" },
   // 传说
   quake:    { tier: 4, name: "地震", cat: "disaster", tgt: "any", desc: "任意地区守军 −40%，居民 −30%" },
   plague:   { tier: 4, name: "瘟疫", cat: "disaster", tgt: "any", desc: "目标及相邻地区守军 −25%，居民 −20%" },
   beasts:   { tier: 4, name: "兽潮", cat: "disaster", tgt: "any", desc: "在任意地区召出 40 头凶兽，与当地守军厮杀" },
   meteor:   { tier: 4, name: "陨星", cat: "disaster", tgt: "any", desc: "天降陨星：守军 −80%，居民 −60%，城墙尽毁" },
   golden:   { tier: 4, name: "盛世", cat: "econ", tgt: "none", desc: "你所有地区民心拉满到 100，居民 +20%" },
-  heaven:   { tier: 4, name: "天兵", cat: "support", tgt: "own", desc: "一个己方地区立刻 +80 兵" }
+  heaven:   { tier: 4, name: "天兵", cat: "support", tgt: "own", desc: "一个己方地区立刻 +80 兵" },
+  dragon:   { tier: 4, name: "真龙", cat: "support", tgt: "none", desc: "真龙附体：2 分钟内你所有军队进攻 ×1.5、所有地区守备 ×1.3" },
+  locust:   { tier: 4, name: "蝗灾", cat: "disaster", tgt: "player", desc: "蝗虫遮天：一名玩家存粮减半，2 分钟内颗粒无收" },
+  mandate:  { tier: 4, name: "天命", cat: "attack", tgt: "enemy", desc: "天命所归：看得见的一座敌方城池（非国都）连人带城直接归你" }
 };
 const DEV_CATS = ["econ", "support"];
 const HAND_MAX = 8;
@@ -96,14 +112,15 @@ const POLICY = {
   massacre:   { name: "屠城", target: 20, desc: "屠尽九成五居民，劫掠 每千人 50 金、40 粮。此城 5 分钟内寸草不生。你所有地区民心 −10，名望 −10，天下皆知：名望很低时，敌人会拼死抵抗你（守备 ×1.2），新占城池民心更低。" }
 };
 const LEVY = { gold: 5, food: 25, n: 10, pop: 250 };
-/* 特殊兵种：开局前每人选一种，只能在「本国国都」训练；攻下别国国都，就能训练那一国的特殊兵种 */
+/* 特殊兵种：开局前每人选一种，只能在「本国国都」训练；攻下别国国都，就能训练那一国的特殊兵种
+ * 每种兵除了攻/守/速，还各有一条独门本事（trait） */
 const UNITS = {
-  hubao:    { name: "虎豹骑", g: "豹", atk: 1.6, def: 1.0, speed: 1.8, cav: 1, tip: "来去如风", desc: "天下精骑。行军速度 ×1.8，进攻 ×1.6；但守城时和普通兵一样" },
-  xianzhen: { name: "陷阵营", g: "陷", atk: 1.9, def: 1.3, speed: .9, tip: "攻无不克", desc: "攻坚死士。进攻 ×1.9，攻城时无视城墙、要塞和山川地形的守备加成" },
-  wudang:   { name: "无当飞军", g: "飞", atk: 1.4, def: 1.3, speed: 1.15, tip: "翻山越岭", desc: "山地奇兵。穿山越林、过沼泽都不减速；遭伏兵、截杀时伤亡减半" },
-  daji:     { name: "大戟士", g: "戟", atk: 1.3, def: 2.4, speed: .85, tip: "坚如磐石", desc: "重甲长戟。驻守时每人顶 2.4 个普通兵，是最好的守城兵" },
-  lianu:    { name: "连弩营", g: "弩", atk: 1.5, def: 1.7, speed: 1, tip: "万弩齐发", desc: "连发劲弩。进攻前先齐射，射杀守军两成；守城 ×1.7" },
-  tengjia:  { name: "藤甲兵", g: "藤", atk: 1.5, def: 1.6, speed: 1, tip: "刀枪不入", desc: "油浸藤甲。被伏击、截杀、天灾伤亡减半——唯独怕火攻，伤亡加倍" }
+  hubao:    { name: "虎豹骑", g: "豹", atk: 1.6, def: 1.0, speed: 1.8, cav: 1, tip: "来去如风", desc: "天下精骑。行军速度 ×1.8，进攻 ×1.6；守城时和普通兵一样", trait: "铁蹄追击：半路截杀时追击范围加倍，野战战力再 ×1.25" },
+  xianzhen: { name: "陷阵营", g: "陷", atk: 1.9, def: 1.3, speed: .9, tip: "攻无不克", desc: "攻坚死士。进攻 ×1.9，攻城时无视城墙、要塞和山川地形的守备加成", trait: "先登夺城：攻下城池后的伤亡只有七成" },
+  wudang:   { name: "无当飞军", g: "飞", atk: 1.4, def: 1.3, speed: 1.15, tip: "翻山越岭", desc: "山地奇兵。穿山越林、过沼泽都不减速；遭伏兵、截杀时伤亡减半", trait: "神出鬼没：别人半路截杀它时追击范围减半；在山地、森林守城 ×1.3" },
+  daji:     { name: "大戟士", g: "戟", atk: 1.3, def: 2.4, speed: .85, tip: "坚如磐石", desc: "重甲长戟。驻守时每人顶 2.4 个普通兵，是最好的守城兵", trait: "铁甲结阵：不怕连弩齐射，火攻伤亡减半" },
+  lianu:    { name: "连弩营", g: "弩", atk: 1.5, def: 1.7, speed: 1, tip: "万弩齐发", desc: "连发劲弩。进攻前先齐射，射杀守军两成；守城 ×1.7", trait: "城头箭雨：有连弩营驻守的城池，来攻的敌军先折损 15%" },
+  tengjia:  { name: "藤甲兵", g: "藤", atk: 1.5, def: 1.6, speed: 1, tip: "刀枪不入", desc: "油浸藤甲。被伏击、截杀、天灾伤亡减半——唯独怕火攻，伤亡加倍", trait: "涉水如履平地：过沼泽、洪区都不减速，野战时伤亡减三成" }
 };
 const UNIT_KEYS = Object.keys(UNITS);
 const TRAIN = { n: 5, gold: 40, food: 30, pop: 200 };
@@ -112,6 +129,7 @@ const ELITE_GROW = 16;
 const eliteCap = R => Math.floor(6 + R.pop / 1000 * 2);
 const RULES = { totalSec: 1500, devSec: 300, finalSec: 180, hegeShare: .6, hegeHold: 60 };
 const SPEED = 8;
+const CATCH = 14; // 半路截杀：两军在同一条官道上相距不到这么远（世界单位）就算追上
 
 /* ---------- 地图生成 ---------- */
 // 地形函数：陆地、山脉（脊线噪声）。渲染层也用同一套函数，保证画出来的山就是挡路的山
@@ -303,12 +321,13 @@ Sim.prototype.reset = function () {
   const cfg = this.cfg, map = this.map;
   this.t = 0; this.applied = new Set(); this.over = null;
   this.R = map.regions.map(r => ({ owner: null, troops: 0, pop: r.pop, cap: TRAITS[r.trait].cap, trait: r.trait, loyalty: 50, policy: "home", pend: null,
-    beast: r.beast, el: {}, home: null, mine: 0, wallUntil: 0, harvestUntil: 0, floodUntil: 0, taxFreeUntil: 0, boomUntil: 0, noGrowUntil: 0, ambush: [], beacon: 0 }));
+    beast: r.beast, el: {}, home: null, mine: 0, wallUntil: 0, harvestUntil: 0, floodUntil: 0, taxFreeUntil: 0, boomUntil: 0, noGrowUntil: 0, ambush: [], beacon: 0,
+    rampart: 0, decoyUntil: 0, ironUntil: 0, patrols: [] }));
   this.P = {}; this.order = cfg.players.map(p => p.id);
   cfg.players.forEach((p, i) => {
     const unit = UNITS[p.unit] ? p.unit : UNIT_KEYS[(hstr(p.id) + i) % UNIT_KEYS.length];
     const st = { id: p.id, unit, name: p.name, color: p.color || COLORS[i], bot: !!p.bot, gold: 60, food: 90, hand: [], hseq: 0, draws: 0, pity: 0,
-      owed: DRAW.startCards, bought: 0, known: new Uint8Array(map.regions.length), snap: {}, alive: true, capital: map.starts[i], renown: 0, got: [] };
+      owed: DRAW.startCards, bought: 0, known: new Uint8Array(map.regions.length), snap: {}, alive: true, capital: map.starts[i], renown: 0, got: [], famineUntil: 0, locustUntil: 0, dragonUntil: 0 };
     this.P[p.id] = st;
     const cap = map.starts[i];
     this.own(cap, p.id, 0); this.R[cap].loyalty = 80; this.R[cap].home = unit; this.R[cap].el[unit] = 14;
@@ -328,11 +347,13 @@ Sim.prototype.own = function (r, pid, troops) { const R = this.R[r], prev = R.ow
 /* 守军：普通兵 + 特殊兵 */
 Sim.prototype.gar = function (R) { let s = R.troops; for (const k in R.el) s += R.el[k]; return s; };
 Sim.prototype.garDef = function (R) { let s = R.troops; for (const k in R.el) s += R.el[k] * UNITS[k].def; return s; };
-// 按比例折损守军；藤甲兵平时伤亡减半、火攻伤亡加倍
+// 按比例折损守军；藤甲兵平时伤亡减半、火攻伤亡加倍；大戟士火攻伤亡减半
 Sim.prototype.cut = function (R, keep, how) {
   R.troops = R.troops * keep;
-  for (const k in R.el) { let kk = keep; if (k === "tengjia") kk = how === "fire" ? Math.max(0, 1 - (1 - keep) * 2) : 1 - (1 - keep) / 2; R.el[k] = Math.round(R.el[k] * kk); if (R.el[k] <= 0) delete R.el[k]; }
+  for (const k in R.el) { let kk = keep; if (k === "tengjia") kk = how === "fire" ? Math.max(0, 1 - (1 - keep) * 2) : 1 - (1 - keep) / 2; if (k === "daji" && how === "fire") kk = 1 - (1 - keep) / 2; R.el[k] = Math.round(R.el[k] * kk); if (R.el[k] <= 0) delete R.el[k]; }
 };
+// 连弩齐射：大戟士结阵不受影响
+Sim.prototype.cutVolley = function (R, keep) { const d = R.el.daji; delete R.el.daji; this.cut(R, keep, "hit"); if (d) R.el.daji = d; };
 Sim.prototype.addTroops = function (R, kind, n) { if (UNITS[kind]) R.el[kind] = (R.el[kind] || 0) + n; else R.troops += n; };
 Sim.prototype.relOf = function (a, b) { if (a === b) return "self"; const k = a < b ? a + "|" + b : b + "|" + a; return this.rel[k] || "peace"; };
 Sim.prototype.setRel = function (a, b, v) { const k = a < b ? a + "|" + b : b + "|" + a; this.rel[k] = v; };
@@ -343,7 +364,8 @@ Sim.prototype.reveal = function (pid, r, radius) {
   for (const x of seen) { this.P[pid].known[x] = 1; this.snapshot(pid, x); }
   return seen;
 };
-Sim.prototype.snapshot = function (pid, r) { const R = this.R[r]; this.P[pid].snap[r] = { t: this.t, owner: R.owner, troops: Math.round(this.gar(R)), el: { ...R.el }, pop: Math.round(R.pop), beast: Math.round(R.beast), mine: R.mine, trait: R.trait, loyalty: Math.round(R.loyalty) }; };
+// 别人看到的情报：疑兵期间守军数虚报成 3 倍
+Sim.prototype.snapshot = function (pid, r) { const R = this.R[r], fake = R.decoyUntil > this.t && R.owner !== pid; this.P[pid].snap[r] = { t: this.t, owner: R.owner, troops: Math.round(this.gar(R) * (fake ? 3 : 1)), el: fake ? Object.fromEntries(Object.entries(R.el).map(([k, v]) => [k, v * 3])) : { ...R.el }, pop: Math.round(R.pop), beast: Math.round(R.beast), mine: R.mine, trait: R.trait, loyalty: Math.round(R.loyalty) }; };
 Sim.prototype.L = function (text, kind, vis, r) { this.log.push({ t: this.t, text, kind, vis: vis === "all" ? "all" : [...new Set(vis)], r }); };
 Sim.prototype.FX = function (kind, o) { this.fx.push({ t0: this.t, kind, ...o }); if (this.fx.length > 400) this.fx.splice(0, 100); };
 Sim.prototype.watchers = function (rs) { return this.order.filter(p => rs.some(r => r != null && this.visible(p, r))); };
@@ -366,8 +388,8 @@ Sim.prototype.rows = function (pid) { const out = []; for (let i = 0; i < this.R
 Sim.prototype.output = function (r) { // 每分钟产出
   const R = this.R[r], T = TERR[this.map.regions[r].terr], Tr = TRAITS[R.trait];
   if (R.floodUntil > this.t) return { gold: 0, food: 0 };
-  const k = R.pop / 1000, lm = .4 + .6 * R.loyalty / 100;
-  const W = this.W, wf = (W.harvest > this.t ? 1.5 : 1) * (W.drought > this.t ? .6 : 1), wg = W.trade > this.t ? 1.5 : 1;
+  const k = R.pop / 1000, lm = .4 + .6 * R.loyalty / 100, st = R.owner ? this.P[R.owner] : null;
+  const W = this.W, wf = (W.harvest > this.t ? 1.5 : 1) * (W.drought > this.t ? .6 : 1) * (st && st.famineUntil > this.t ? .5 : 1) * (st && st.locustUntil > this.t ? 0 : 1), wg = W.trade > this.t ? 1.5 : 1;
   const food = k * 6 * T.food * Tr.food * lm * (R.harvestUntil > this.t ? 2 : 1) * wf;
   let gold = k * 4.5 * T.gold * Tr.gold * lm * (R.policy === "tax" ? 1.6 : 1) * wg + R.mine * 8;
   if (R.taxFreeUntil > this.t) gold = R.mine * 8;
@@ -381,10 +403,15 @@ Sim.prototype.income = function (pid) {
 };
 Sim.prototype.defMult = function (r, attacker, breach) {
   const R = this.R[r];
-  let m = breach ? 1 : TERR[this.map.regions[r].terr].def * (TRAITS[R.trait].def || 1) * (R.wallUntil > this.t ? 1.6 : 1);
+  let m = breach ? 1 : TERR[this.map.regions[r].terr].def * (TRAITS[R.trait].def || 1) * (R.wallUntil > this.t ? 1.6 : 1) * (R.rampart ? 1.2 : 1) * (R.ironUntil > this.t ? 2.2 : 1);
   if (attacker && R.owner && this.P[attacker] && this.P[attacker].renown <= -10) m *= 1.2; // 哀兵：百姓不愿落入屠夫之手
+  if (R.owner && this.P[R.owner] && this.P[R.owner].dragonUntil > this.t) m *= 1.3; // 真龙护佑
   return m;
 };
+// 守军折算：无当飞军在山林守城更强
+Sim.prototype.garDefAt = function (r) { const R = this.R[r], terr = this.map.regions[r].terr; let s = R.troops; for (const k in R.el) s += R.el[k] * UNITS[k].def * (k === "wudang" && (terr === "hill" || terr === "forest") ? 1.3 : 1); return s; };
+// 军队的进攻倍率：兵种 × 真龙
+Sim.prototype.armyAtk = function (a) { return a.atk * (this.P[a.owner] && this.P[a.owner].dragonUntil > this.t ? 1.5 : 1); };
 Sim.prototype.loyAll = function (pid, d) { this.R.forEach(R => { if (R.owner === pid) R.loyalty = Math.max(0, Math.min(100, R.loyalty + d)); }); };
 
 /* ---------- 行军 ---------- */
@@ -413,29 +440,51 @@ Sim.prototype.routePt = function (a, b, d) {
   return { x: pts[0][0], y: pts[0][1], ang: 0 };
 };
 Sim.prototype.segSpeed = function (a, b) { return (TERR[this.map.regions[a].terr].speed + TERR[this.map.regions[b].terr].speed) / 2; };
+/* 半路截杀的行军计划：从 from 出发，先到敌军要去的下一站 T，再迎着敌军走上它正在走的那条官道 */
+Sim.prototype.huntPlan = function (pid, from, armyId) {
+  const e = this.armies.find(x => x.id === armyId && x.troops > 0);
+  if (!e || e.owner === pid) return "要选一支他人的军队";
+  if (!this.armyVisibleTo(e, pid)) return "看不见这支军队";
+  if (this.relOf(pid, e.owner) === "ally") return "不能截杀盟友";
+  if (this.dev()) return "发育期内不能攻击其他玩家";
+  const X = e.path[e.idx], T = e.path[e.idx + 1];
+  if (T == null) return "这支军队已经到了";
+  let path;
+  if (from === X) path = [X, T]; // 就在敌军身后：追着走
+  else { path = this.path(from, T); if (!path) return "到不了那里"; if (path[path.length - 1] !== X) path.push(X); }
+  return { path, T, X, e };
+};
 Sim.prototype.launch = function (pid, from, to, n, opt = {}) {
-  const path = this.path(from, to); if (!path) return "到不了那里";
+  let path, hunt = null;
+  if (opt.hunt != null) { const plan = this.huntPlan(pid, from, opt.hunt); if (typeof plan === "string") return plan; path = plan.path; hunt = plan; }
+  else { path = this.path(from, to); if (!path) return "到不了那里"; }
   const U = UNITS[opt.kind];
   if (U) { this.R[from].el[opt.kind] -= n; if (this.R[from].el[opt.kind] <= 0) delete this.R[from].el[opt.kind]; } else this.R[from].troops -= n;
-  const a = { id: ++this.aseq, owner: pid, path, idx: 0, d: 0, troops: n, atk: U ? U.atk : opt.atk || 1, speed: U ? U.speed : opt.speed || 1, born: this.t, seen: [], kind: opt.kind || "army" };
+  const a = { id: ++this.aseq, owner: pid, path, idx: 0, d: 0, troops: n, atk: U ? U.atk : opt.atk || 1, speed: U ? U.speed : opt.speed || 1, born: this.t, seen: [], kind: opt.kind || "army", hiddenUntil: opt.hidden ? this.t + 180 : 0,
+    hunt: hunt ? hunt.e.id : 0, huntTo: hunt ? hunt.T : -1, home: from, ld: null };
   this.armies.push(a);
-  this.FX("march", { r: from, r2: to, by: pid, vis: this.watchers([from]).concat(pid) });
+  this.FX("march", { r: from, r2: hunt ? hunt.T : to, by: pid, vis: this.watchers([from]).concat(pid) });
+  if (hunt) this.L(`${this.pname(pid)}从${this.rname(from)}派出 ${n} 兵，半路截杀${this.pname(hunt.e.owner)}的军队`, "info", [pid], from);
   this.enterSeg(a);
   return null;
 };
-// 看得见一支军队 = 它此刻正身处你看得见的地区（前半程算出发地，后半程算目的地）
+// 看得见一支军队 = 它此刻正身处你看得见的地区（前半程算出发地，后半程算目的地）；巡哨过的地区也看得见；奇袭部队谁都看不见
 Sim.prototype.armyVisibleTo = function (a, pid) {
   if (a.owner === pid) return true;
   if (this.relOf(pid, a.owner) === "ally") return true; // 盟友互通军情
+  if (a.hiddenUntil > this.t && !this.final()) return false;
   const A = a.path[a.idx], B = a.path[a.idx + 1], at = B == null || a.d < this.segLen(A, B) / 2 ? A : B;
+  if (this.R[at].patrols.some(q => q.until > this.t && (q.by === pid || this.relOf(pid, q.by) === "ally"))) return true;
   if (this.W.fog > this.t) return this.R[at].owner === pid; // 大雾：只看得见自家地界里的军队
   return this.visible(pid, at);
 };
 Sim.prototype.enterSeg = function (a) {
   const from = a.path[a.idx], to = a.path[a.idx + 1];
+  if (a.hiddenUntil > this.t && !this.final()) return;
   for (const p of this.order) {
     if (p === a.owner || !this.P[p].alive) continue;
-    if (this.W.fog > this.t ? !(this.R[from].owner === p || this.R[to].owner === p) : !(this.visible(p, from) || this.visible(p, to))) continue;
+    const patrol = r => this.R[r].patrols.some(q => q.until > this.t && (q.by === p || this.relOf(p, q.by) === "ally"));
+    if (this.W.fog > this.t ? !(this.R[from].owner === p || this.R[to].owner === p || patrol(from) || patrol(to)) : !(this.visible(p, from) || this.visible(p, to) || patrol(from) || patrol(to))) continue;
     const nextMine = this.R[to].owner === p, key = p + (nextMine ? "!" : "");
     if (a.seen.includes(key)) continue;
     a.seen.push(key);
@@ -456,17 +505,75 @@ Sim.prototype.stepArmies = function () {
       const node = a.path[a.idx];
       this.checkAmbush(a, node);
       if (a.troops <= 0) break;
-      if (a.idx === a.path.length - 1) { this.arrive(a, node); a.troops = -1; break; }
+      if (a.idx === a.path.length - 1) { if (a.hunt) { if (this.huntEnd(a, node)) continue; } this.arrive(a, node); a.troops = -1; break; }
       this.enterSeg(a);
     }
   }
+  this.checkHunts();
   this.armies = this.armies.filter(a => a.troops > 0);
 };
 Sim.prototype.armyStep = function (a) { // 每秒走多远
   const A = a.path[a.idx], B = a.path[a.idx + 1];
-  let move = SPEED * a.speed * (a.kind === "wudang" ? 1 : this.segSpeed(A, B));
-  if (this.R[A].floodUntil > this.t || this.R[B].floodUntil > this.t) move *= .5;
+  let move = SPEED * a.speed * (a.kind === "wudang" ? 1 : a.kind === "tengjia" ? Math.max(this.segSpeed(A, B), 1) : this.segSpeed(A, B));
+  if ((this.R[A].floodUntil > this.t || this.R[B].floodUntil > this.t) && a.kind !== "tengjia") move *= .5;
   return move;
+};
+/* ---------- 半路截杀 ---------- */
+// 追击失败后该去哪：目标城还是自己人的就去帮忙守，否则回老家
+Sim.prototype.huntDest = function (a) { const T = this.R[a.huntTo]; return T && (T.owner === a.owner || (T.owner && this.relOf(a.owner, T.owner) === "ally")) ? a.huntTo : a.home; };
+// 追到了路的尽头也没追上（走到了敌军的出发地）：别去攻城，改道
+Sim.prototype.huntEnd = function (a, node) {
+  const dest = this.huntDest(a); a.hunt = 0; a.ld = null;
+  if (node === dest) return false; // 正好就是要去的地方：照常进城
+  const p = this.path(node, dest); if (!p) return false;
+  a.path = p; a.idx = 0; a.d = 0; this.enterSeg(a);
+  this.L(`截杀未果，${this.rname(node)}一带的部队转往${this.rname(dest)}`, "info", [a.owner], node);
+  return true;
+};
+// 原地掉头：当前在 A→B 段走了 d，改成 B→A 再接着去 dest
+Sim.prototype.turnBack = function (a, dest) {
+  const A = a.path[a.idx], B = a.path[a.idx + 1], L = this.segLen(A, B);
+  if (B === dest) { a.path = a.path.slice(0, a.idx + 2); return; }
+  const rest = A === dest ? [A] : (this.path(A, dest) || [A]);
+  a.path = [B, ...rest]; a.idx = 0; a.d = Math.max(0, L - a.d); a.seen = []; this.enterSeg(a);
+};
+Sim.prototype.checkHunts = function () {
+  for (const a of this.armies) {
+    if (!a.hunt || a.troops <= 0 || a.idx >= a.path.length - 1) continue;
+    const e = this.armies.find(x => x.id === a.hunt && x.troops > 0);
+    if (!e || e.idx >= e.path.length - 1) { // 目标没了（已到达或被歼灭）
+      a.hunt = 0; a.ld = null; const dest = this.huntDest(a);
+      this.turnBack(a, dest);
+      this.L(`没能追上敌军，部队转往${this.rname(dest)}${dest === a.huntTo ? "助守" : ""}`, "info", [a.owner], dest);
+      continue;
+    }
+    const A = a.path[a.idx], B = a.path[a.idx + 1], C = e.path[e.idx], D = e.path[e.idx + 1];
+    const same = (A === C && B === D) || (A === D && B === C);
+    if (!same) { a.ld = null; continue; }
+    const L = this.segLen(A, B), ep = C === A ? e.d : L - e.d, diff = ep - a.d; // 都从 A 这头量
+    let radius = CATCH * (a.kind === "hubao" ? 2 : 1) * (e.kind === "wudang" ? .5 : 1);
+    const crossed = a.ld != null && ((a.ld > 0 && diff < 0) || (a.ld < 0 && diff > 0));
+    if (Math.abs(diff) <= radius || crossed) this.clash(a, e, A, B, Math.max(0, Math.min(L, a.d + diff / 2)));
+    else a.ld = diff;
+  }
+};
+// 野战：两军在官道上相遇
+Sim.prototype.clash = function (h, e, A, B, d) {
+  const pt = this.routePt(A, B, d), vis = this.watchers([A, B]).concat(h.owner, e.owner);
+  const mul = x => this.armyAtk(x) * (x.kind === "hubao" ? 1.25 : 1);
+  const Sh = h.troops * mul(h), Se = e.troops * mul(e), lossK = x => x.kind === "tengjia" ? .6 : .85;
+  if (this.relOf(h.owner, e.owner) === "peace") this.declare(h.owner, e.owner);
+  this.FX("clash", { x: pt.x, y: pt.y, r: A, by: h.owner, def: e.owner, u: h.kind, u2: e.kind, vis });
+  if (Sh > Se) {
+    const before = h.troops, left = Math.max(1, Math.round(before - Se / mul(h) * lossK(h))), dead = Math.round(e.troops);
+    h.troops = left; e.troops = 0;
+    this.L(`⚔ ${this.pname(h.owner)}在${this.rname(A)}—${this.rname(B)}的官道上截住了${this.pname(e.owner)}的军队，歼敌 ${dead}，自损 ${Math.round(before - left)}`, "battle", vis, A);
+    h.hunt = 0; h.ld = null; const dest = this.huntDest(h); this.turnBack(h, dest);
+  } else {
+    const before = e.troops, left = Math.max(1, Math.round(before - Sh / mul(e) * lossK(e))), dead = Math.round(h.troops);
+    e.troops = left; h.troops = 0;
+    this.L(`⚔ ${this.pname(h.owner)}的截杀部队在${this.rname(A)}—${this.rname(B)}的官道上被${this.pname(e.owner)}击溃，${dead} 兵尽没，敌军折损 ${Math.round(before - left)}`, "battle", vis, A);
+  }
 };
 Sim.prototype.checkAmbush = function (a, r) {
   const R = this.R[r];
@@ -496,15 +603,17 @@ Sim.prototype.arrive = function (a, r) {
     this.declare(p, R.owner);
   }
   this.FX("battle", { r, by: p, def: R.owner || (R.beast > R.troops ? "beast" : null), u: a.kind, vis });
-  if (a.kind === "lianu" && (this.gar(R) + R.beast) > 0) { this.cut(R, .8, "hit"); R.beast *= .8; this.FX("volley", { r, by: p, vis }); } // 连弩先射一轮
-  const dm = this.defMult(r, p, a.kind === "xianzhen"), def = (this.garDef(R) + R.beast) * dm, atk = a.troops * a.atk, was = R.owner;
+  if (a.kind === "lianu" && (this.gar(R) + R.beast) > 0) { this.cutVolley(R, .8); R.beast *= .8; this.FX("volley", { r, by: p, vis }); } // 连弩先射一轮（大戟士不怕）
+  if ((R.el.lianu || 0) > 0 && R.owner) { a.troops = Math.max(1, Math.round(a.troops * .85)); this.FX("volley", { r, by: R.owner, vis }); } // 城头箭雨
+  const aa = this.armyAtk(a);
+  const dm = this.defMult(r, p, a.kind === "xianzhen"), def = (this.garDefAt(r) + R.beast) * dm, atk = a.troops * aa, was = R.owner;
   if (atk > def) {
-    const left = Math.max(1, Math.round(a.troops - def / a.atk * .85));
+    const left = Math.max(1, Math.round(a.troops - def / aa * (a.kind === "xianzhen" ? .6 : .85)));
     this.own(r, p, 0); this.addTroops(R, a.kind, left);
     this.capture(r, p, was, vis);
     if (was) this.checkDead(was);
   } else {
-    const dmg = atk / dm * .85, raw = Math.max(1, this.garDef(R) + R.beast), keep = Math.max(0, 1 - dmg / raw);
+    const dmg = atk / dm * .85, raw = Math.max(1, this.garDefAt(r) + R.beast), keep = Math.max(0, 1 - dmg / raw);
     R.beast = Math.max(0, R.beast * keep); this.cut(R, keep, "battle"); R.troops = Math.max(0, R.troops);
     this.L(was ? `${this.pname(p)}进攻${this.rname(r)}失败，${Math.round(a.troops)} 兵全军覆没` : `${this.pname(p)}的军队在${this.rname(r)}被${R.beast > 0 ? "凶兽" : "当地民兵"}击溃`, "battle", vis, r);
   }
@@ -586,7 +695,7 @@ Sim.prototype.ev_sac = function (st, a) {
     this.L(`${st.name}在${this.rname(a.r)}举行血祭，${dead} 名百姓殒命`, "sac", vis, a.r);
   } else if (a.kind === "city") {
     if (this.rows(st.id).length <= 1) return "这是你最后一座城";
-    R.owner = null; R.troops = 0; R.el = {}; R.home = null; R.pop = 0; R.cap = 0; R.trait = "ruin"; R.loyalty = 0; R.mine = 0; R.policy = "home"; R.pend = null; R.beacon = 0;
+    R.owner = null; R.troops = 0; R.el = {}; R.home = null; R.pop = 0; R.cap = 0; R.trait = "ruin"; R.loyalty = 0; R.mine = 0; R.policy = "home"; R.pend = null; R.beacon = 0; R.rampart = 0; R.decoyUntil = 0; R.ironUntil = 0;
     this.loyAll(st.id, -10); st.renown -= 2; this.snapshot(st.id, a.r);
     this.L(`${st.name}亲手焚毁了${this.rname(a.r)}，那里化为一片焦土`, "sac", "all", a.r);
     this.fixCapital(st.id);
@@ -631,20 +740,18 @@ Sim.prototype.ev_train = function (st, a) {
   this.FX("train", { r: a.r, u: R.home, vis: this.watchers([a.r]).concat(st.id) }); return null;
 };
 Sim.prototype.ev_move = function (st, a) {
-  const R = this.R[a.from], T = this.R[a.to];
-  if (!R || !T || R.owner !== st.id) return "只能从自己的地区出兵";
-  const n = Math.floor(a.n);
+  const R = this.R[a.from], hunt = a.hunt != null ? a.hunt : null, T = hunt != null ? null : this.R[a.to];
+  if (!R || (!T && hunt == null) || R.owner !== st.id) return "只能从自己的地区出兵";
+  const n = Math.floor(a.n), opt = hunt != null ? { hunt } : {};
   if (a.u) {
     if (!UNITS[a.u]) return "无效兵种";
     if (!(n >= 1) || n > (R.el[a.u] || 0)) return "这里没有那么多" + UNITS[a.u].name;
-    if (a.from === a.to) return "目标和出发地相同";
-    if (this.dev() && T.owner && T.owner !== st.id && this.relOf(st.id, T.owner) !== "ally") return "发育期内不能进攻其他玩家";
-    return this.launch(st.id, a.from, a.to, n, { kind: a.u });
-  }
-  if (!(n >= 1) || n > R.troops - 1) return "兵力不够（至少留 1 兵守家）";
+    opt.kind = a.u;
+  } else if (!(n >= 1) || n > R.troops - 1) return "兵力不够（至少留 1 兵守家）";
+  if (hunt != null) return this.launch(st.id, a.from, null, n, opt);
   if (a.from === a.to) return "目标和出发地相同";
   if (this.dev() && T.owner && T.owner !== st.id && this.relOf(st.id, T.owner) !== "ally") return "发育期内不能进攻其他玩家";
-  return this.launch(st.id, a.from, a.to, n);
+  return this.launch(st.id, a.from, a.to, n, opt);
 };
 Sim.prototype.ev_ally = function (st, a) {
   const o = this.P[a.to]; if (!o || !o.alive || o.id === st.id) return "无效";
@@ -699,7 +806,49 @@ Sim.prototype.useCard = function (st, k, a) {
       if (!M.adj.some(b => this.R[b].owner === me)) return "只能驯服相邻地区的凶兽";
       const n = Math.round(R.beast * .7) + Math.round(R.troops); this.own(r, me, n); R.loyalty = 55; R.policy = "home"; this.FX("tame", { r, by: me, vis: vis([r]) }); this.L(`驯服了${M.name}的凶兽，收编 ${n} 兵`, "info", vis([r]), r); return null;
     }
-    case "swift": { const ar = this.armies.find(x => x.id === a.army && x.owner === me); if (!ar) return "要选你正在行进的军队"; ar.speed *= 2; this.FX("swift", { army: ar.id, vis: [me] }); return null; }
+    case "swift": case "march": { const ar = this.armies.find(x => x.id === a.army && x.owner === me); if (!ar) return "要选你正在行进的军队"; ar.speed *= k === "swift" ? 2 : 1.5; this.FX("swift", { army: ar.id, vis: [me] }); return null; }
+    case "granary": { st.food += 120; this.FX("tax", { by: me, vis: [me] }); return null; }
+    case "conscript": { const e = mineReq(); if (e) return e; if (R.pop < 900) return "居民太少（要 900 人以上）"; R.troops += 40; R.pop -= 600; R.loyalty = Math.max(0, R.loyalty - 10); this.FX("levy", { r, vis: vis([r]) }); this.L(`${M.name}强征 40 兵，民怨渐起`, "info", [me], r); return null; }
+    case "patrol": { const e = mineReq(); if (e) return e; for (const x of [r, ...M.adj]) { const X = this.R[x]; X.patrols = X.patrols.filter(q => q.by !== me); X.patrols.push({ by: me, until: this.t + 180 }); } this.FX("scout", { r, vis: [me] }); return null; }
+    case "rampart": { const e = mineReq(); if (e) return e; if (R.rampart) return "这里已经筑过垒了"; R.rampart = 1; this.FX("wall", { r, vis: vis([r]) }); return null; }
+    case "decoy": { const e = mineReq(); if (e) return e; R.decoyUntil = this.t + 180; this.FX("rally", { r, r2: r, vis: [me] }); return null; }
+    case "ironwall": { const e = mineReq(); if (e) return e; R.ironUntil = this.t + 180; this.FX("wall", { r, vis: vis([r]) }); return null; }
+    case "feast": { this.rows(me).forEach(i => { const X = this.R[i]; X.loyalty = Math.min(100, X.loyalty + 12); if (!X.home) X.troops += 3; }); this.FX("golden", { r: st.capital, vis: [me] }); this.L("犒赏三军，万众欢腾", "info", [me]); return null; }
+    case "dragon": { st.dragonUntil = this.t + 120; this.FX("heaven", { r: st.capital, vis: this.order.slice() }); this.L(`${st.name}真龙附体，两分钟内攻守皆强`, "info", "all", st.capital); return null; }
+    case "blockade": case "locust": {
+      const o = this.P[a.p]; if (!o || o.id === me || !o.alive) return "要选另一名玩家";
+      if (this.relOf(me, o.id) === "ally") return "不能对盟友下手";
+      if (k === "blockade") { o.famineUntil = this.t + 120; this.L(`${o.name}的粮道被切断，两分钟内粮产减半`, "disaster", [o.id, me]); }
+      else { o.locustUntil = this.t + 120; o.food = Math.round(o.food / 2); this.L(`${o.name}境内蝗虫遮天蔽日：存粮减半，两分钟颗粒无收`, "disaster", "all", o.capital); }
+      this.FX("spy", { p: o.id, vis: [me, o.id] });
+      if (k === "blockade" && this.relOf(me, o.id) === "peace") this.declare(me, o.id);
+      return null;
+    }
+    case "raid": case "rumor": case "mandate": {
+      if (!R || !R.owner || R.owner === me || !this.visible(me, r)) return "要选看得见的他人地区";
+      if (this.relOf(me, R.owner) === "ally") return "不能对盟友下手";
+      const victim = R.owner, vv = vis([r]).concat(victim), kk = R.pop / 1000;
+      if (k === "raid") { const g = Math.round(kk * 20), f = Math.round(kk * 15); st.gold += g; st.food += f; this.P[victim].gold = Math.max(0, this.P[victim].gold - g); this.P[victim].food = Math.max(0, this.P[victim].food - f); R.loyalty = Math.max(0, R.loyalty - 10); this.FX("fire", { r, r2: this.nearestOwn(me, r), vis: vv }); this.L(`${st.name}洗劫了${M.name}，掠走 ${g} 金 ${f} 粮`, "battle", vv, r); }
+      else if (k === "rumor") { R.loyalty = Math.max(0, R.loyalty - 20); R.pop = Math.round(R.pop * .95); this.FX("subvert", { r, vis: vv }); this.L(`${M.name}流言四起，人心惶惶`, "disaster", vv, r); }
+      else { if (this.P[victim].capital === r) return "天命不临国都"; if (this.rows(victim).length <= 1) return "这是他最后一座城"; this.own(r, me, Math.round(this.gar(R))); R.loyalty = 45; R.policy = "military"; this.FX("capture", { r, by: me, vis: vv }); this.L(`天命所归！${M.name}举城归顺${st.name}`, "battle", "all", r); this.checkDead(victim); this.fixCapital(victim); }
+      if (this.relOf(me, victim) === "peace") this.declare(me, victim);
+      return null;
+    }
+    case "stealth": {
+      const F = this.R[a.from], T = this.R[a.to];
+      if (!F || F.owner !== me) return "要从自己的地区出发";
+      if (!T || a.to === a.from) return "要选目标地区";
+      const n = Math.floor(a.n); if (!(n >= 1) || n > F.troops - 1) return "兵力不够";
+      if (T.owner && T.owner !== me && this.relOf(me, T.owner) !== "ally" && this.dev()) return "发育期不能进攻其他玩家";
+      return this.launch(me, a.from, a.to, n, { kind: "stealth", hidden: 1 });
+    }
+    case "storm": {
+      if (!R) return "要选一个地区";
+      const hit = [r, ...M.adj], vv = vis(hit).concat(...hit.map(x => this.R[x].owner).filter(Boolean));
+      hit.forEach(x => { this.R[x].floodUntil = Math.max(this.R[x].floodUntil, this.t + 120); });
+      this.FX("flood", { r, by: me, vis: vv }); this.L(`${M.name}一带暴雨倾盆，道路泥泞`, "disaster", vv, r);
+      return null;
+    }
     case "rally": {
       const e = mineReq(); if (e) return e; let got = 0;
       for (const b of M.adj) { const B = this.R[b]; if (B.owner === me && B.troops > 2) { const n = Math.floor(B.troops / 2); B.troops -= n; got += n; this.FX("rally", { r: b, r2: r, vis: vis([b, r]) }); } }
@@ -733,6 +882,7 @@ Sim.prototype.useCard = function (st, k, a) {
       if (this.relOf(me, R.owner) === "ally") return "不能对盟友下手";
       const victim = R.owner, vv = vis([r]).concat(victim);
       if (k === "fire") {
+        if (R.ironUntil > this.t) { this.FX("fire", { r, r2: this.nearestOwn(me, r), vis: vv }); this.L(`${M.name}铁壁森严，火攻无功`, "info", vv, r); return null; }
         const before = this.gar(R); this.cut(R, .65, "fire"); R.troops = Math.round(R.troops); const k2 = Math.round(before - this.gar(R)); R.pop = Math.round(R.pop * .9);
         this.FX("fire", { r, r2: this.nearestOwn(me, r), vis: vv });
         this.L(`${st.name}火烧${M.name}，烧死守军 ${k2}`, "battle", vv, r);
@@ -811,7 +961,7 @@ Sim.prototype.tick = function () {
   }
   // 待处置的城池：超时默认军管
   this.R.forEach((R, i) => { if (R.pend && R.pend.until <= t) { R.policy = "military"; R.loyalty = Math.max(R.loyalty, 40); R.pend = null; this.L(`${this.rname(i)}未下令处置，默认军管`, "info", [R.owner], i); } });
-  if (t % 10 === 0) this.people();
+  if (t % 10 === 0) { this.people(); this.R.forEach(R => { if (R.patrols.length) R.patrols = R.patrols.filter(q => q.until > t); }); }
   if (t % ELITE_GROW === 0) this.R.forEach(R => {
     if (!R.owner || !R.home || R.pop < 500) return;
     let n = 0; for (const k in R.el) n += R.el[k];
@@ -978,5 +1128,5 @@ Sim.prototype.run = function (events, upto) {
   return true;
 };
 
-root.LZ = { ELITE_GROW, eliteCap, UNITS, UNIT_KEYS, TRAIN, MT, terrainFns, OMENS, RULES, SPEED, Sim, genMap, CARDS, CATS, TIERS, TRAITS, POLICY, SAC, DRAW, DEV_CATS, TERR, COLORS, HAND_MAX, LEVY, WORLD, RW, CELL, h2, hstr, mulberry, fbm };
+root.LZ = { ELITE_GROW, eliteCap, UNITS, UNIT_KEYS, TRAIN, MT, terrainFns, OMENS, RULES, SPEED, CATCH, Sim, genMap, CARDS, CATS, TIERS, TRAITS, POLICY, SAC, DRAW, DEV_CATS, TERR, COLORS, HAND_MAX, LEVY, WORLD, RW, CELL, h2, hstr, mulberry, fbm };
 })(typeof window !== "undefined" ? window : globalThis);

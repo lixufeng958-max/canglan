@@ -1,5 +1,5 @@
 /* 声音：全部用 Web Audio 现场合成，不需要下载任何音频文件
- * 背景乐：五声音阶（宫商角徵羽）的古琴拨弦 + 箫声长音 + 低音持续音；开战后加入战鼓，决战时鼓点更急
+ * 背景乐：太鼓与战鼓打底，号角齐鸣领奏，低音弦推进，开战后加入战吼；发育期稍缓，决战时鼓点最急
  * 音效：发牌、交战、攻城、天时、警报、训练、出兵 */
 (function (root) {
 "use strict";
@@ -145,9 +145,39 @@ function cymbal(t, vel = .35) {
   g.gain.setValueAtTime(vel * .3, t); g.gain.exponentialRampToValueAtTime(.001, t + 1.8); n.connect(f); f.connect(g); out(g, true); n.start(t); n.stop(t + 2);
 }
 
-/* ---------- 作曲：战鼓开路，号角领奏，低音弦推进 ----------
- 以十六分音符为步长排程；乐句是预先写好的两小节动机，随机组合、移调 */
-const TEMPO = { menu: 96, dev: 104, war: 120, final: 138 };
+/* ---------- 更多战争乐器 ---------- */
+// 太鼓：很低的正弦下落 + 皮面噪声，尾音长
+function taiko(t, vel = .8, bus, hz = 46) {
+  const o = ctx.createOscillator(), g = ctx.createGain(); o.type = "sine";
+  o.frequency.setValueAtTime(hz * 3, t); o.frequency.exponentialRampToValueAtTime(hz, t + .09);
+  g.gain.setValueAtTime(vel * 1.1, t); g.gain.exponentialRampToValueAtTime(.001, t + .9);
+  o.connect(g); out(g, true, bus); o.start(t); o.stop(t + 1);
+  const n = noise(.3), f = ctx.createBiquadFilter(), ng = ctx.createGain(); f.type = "lowpass"; f.frequency.value = 600;
+  ng.gain.setValueAtTime(vel * .5, t); ng.gain.exponentialRampToValueAtTime(.001, t + .2); n.connect(f); f.connect(ng); out(ng, true, bus); n.start(t); n.stop(t + .3);
+  const o2 = ctx.createOscillator(), g2 = ctx.createGain(); o2.type = "triangle"; o2.frequency.setValueAtTime(hz * 2.3, t); o2.frequency.exponentialRampToValueAtTime(hz * 1.1, t + .05);
+  g2.gain.setValueAtTime(vel * .35, t); g2.gain.exponentialRampToValueAtTime(.001, t + .25); o2.connect(g2); out(g2, false, bus); o2.start(t); o2.stop(t + .3);
+}
+// 通鼓（中音鼓）
+function tom(t, vel = .5, hz = 150) {
+  const o = ctx.createOscillator(), g = ctx.createGain(); o.type = "sine";
+  o.frequency.setValueAtTime(hz * 1.8, t); o.frequency.exponentialRampToValueAtTime(hz, t + .07);
+  g.gain.setValueAtTime(vel * .7, t); g.gain.exponentialRampToValueAtTime(.001, t + .32);
+  o.connect(g); out(g, true); o.start(t); o.stop(t + .35);
+}
+// 战吼：一群人的低吼“嗬！”——几支锯齿波叠一个元音共振峰，短促有力
+function chant(t, vel = .5, hz = 110, dur = .32) {
+  const g = ctx.createGain(); g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(vel * .16, t + .03); g.gain.setValueAtTime(vel * .14, t + dur * .6); g.gain.exponentialRampToValueAtTime(.001, t + dur + .1);
+  const f1 = ctx.createBiquadFilter(), f2 = ctx.createBiquadFilter(); f1.type = "bandpass"; f1.Q.value = 2.5; f2.type = "bandpass"; f2.Q.value = 3;
+  f1.frequency.setValueAtTime(500, t); f1.frequency.exponentialRampToValueAtTime(780, t + dur); f2.frequency.setValueAtTime(900, t); f2.frequency.exponentialRampToValueAtTime(1200, t + dur);
+  for (const det of [-14, -5, 4, 11, 19]) { const o = ctx.createOscillator(); o.type = "sawtooth"; o.detune.value = det; o.frequency.setValueAtTime(hz * .96, t); o.frequency.exponentialRampToValueAtTime(hz, t + .08); o.connect(f1); o.connect(f2); o.start(t); o.stop(t + dur + .15); }
+  const mg = ctx.createGain(); mg.gain.value = .5; f1.connect(mg); f2.connect(mg); mg.connect(g); out(g, true);
+}
+// 号角齐鸣：主号 + 低八度 + 五度，带起音爆发
+function fanfare(t, hz, dur, vel, prev) { horn(t, hz, dur, vel, prev); horn(t + .01, hz / 2, dur, vel * .55); if (dur > .5) horn(t + .02, hz * 1.5, dur * .9, vel * .3); }
+
+/* ---------- 作曲：太鼓开路，号角齐鸣，战吼助威，低音弦推进 ----------
+ 以十六分音符为步长排程；乐句是预先写好的两小节动机，随机组合 */
+const TEMPO = { menu: 100, dev: 112, war: 128, final: 148 };
 // 两小节旋律（音级, 时值[十六分]），每句共 32 步
 const PHRASES = [
   [[5, 4], [5, 2], [7, 2], [8, 6], [7, 2], [5, 4], [4, 4], [5, 8]],
@@ -155,39 +185,48 @@ const PHRASES = [
   [[5, 6], [4, 2], [2, 4], [4, 4], [5, 4], [7, 4], [5, 8]],
   [[10, 4], [8, 4], [7, 2], [8, 2], [7, 4], [5, 4], [4, 4], [5, 8]],
   [[7, 4], [5, 4], [4, 4], [2, 4], [4, 8], [0, 8]],
-  [[5, 2], [5, 2], [5, 2], [7, 2], [8, 4], [7, 4], [10, 6], [8, 2], [7, 8]]
+  [[5, 2], [5, 2], [5, 2], [7, 2], [8, 4], [7, 4], [10, 6], [8, 2], [7, 8]],
+  [[5, 3], [5, 1], [5, 4], [8, 4], [7, 4], [10, 3], [10, 1], [10, 4], [12, 8]], // 号角冲锋句
+  [[0, 2], [0, 2], [5, 4], [4, 2], [2, 2], [0, 4], [2, 4], [4, 4], [5, 8]]
 ];
 const ROOTS = [0, 0, -1, -2, 0, 0, -3, -1]; // 每小节低音根音（音级），A A G E A A D G
-// 战鼓谱：每小节 16 步，数字为力度
+// 太鼓谱：每小节 16 步，数字为力度
 const KICK = {
   menu:  [1, 0, 0, 0, 0, 0, .6, 0, .9, 0, 0, 0, 0, 0, .5, 0],
-  dev:   [1, 0, 0, 0, 0, 0, .5, 0, .9, 0, .5, 0, 0, 0, 0, 0],
-  war:   [1, 0, 0, .4, 0, 0, .7, 0, .9, 0, 0, .6, 0, 0, .7, 0],
-  final: [1, 0, .5, 0, .8, 0, .6, 0, 1, 0, .5, .5, .8, 0, .6, .6]
+  dev:   [1, 0, 0, 0, .5, 0, .6, 0, .9, 0, 0, 0, .5, 0, 0, 0],
+  war:   [1, 0, 0, .5, 0, 0, .8, 0, 1, 0, 0, .6, 0, 0, .8, .5],
+  final: [1, 0, .6, 0, .9, 0, .7, .4, 1, 0, .6, .6, .9, 0, .7, .7]
 };
+// 通鼓过门（每 4 小节的末拍）
+const FILL = [0, 0, 0, 0, 0, 0, 0, 0, .5, 0, .6, 0, .7, .7, .9, 1];
 let horizon = null, nextT = 0, step = 0, phrase = null, pIdx = 0, pLeft = 0, prevHz = 0, curNote = null;
 function schedule() {
   if (!ctx || !musicOn) { if (ctx) nextT = Math.max(nextT, ctx.currentTime + .1); return; }
   while (nextT < (horizon != null ? horizon : ctx.currentTime + .5)) {
-    const bpm = TEMPO[phase] || 100, st = 60 / bpm / 4, t = nextT, s16 = step % 16, bar = Math.floor(step / 16), war = phase === "war" || phase === "final";
-    // 鼓
+    const bpm = TEMPO[phase] || 100, st = 60 / bpm / 4, t = nextT, s16 = step % 16, bar = Math.floor(step / 16), war = phase === "war" || phase === "final", fin = phase === "final";
+    // 太鼓与战鼓
     const kv = (KICK[phase] || KICK.menu)[s16];
-    if (kv) drum(t, kv * (war ? .75 : .6), null, s16 % 8 === 0 ? 55 : 82);
-    if (war && (s16 === 4 || s16 === 12)) snare(t, .45);
-    if (phase === "final" && bar % 4 === 3 && s16 >= 8) snare(t, .2 + (s16 - 8) * .04);
+    if (kv) { if (s16 % 8 === 0) taiko(t, kv * (war ? .95 : .7)); else drum(t, kv * (war ? .7 : .55), null, s16 % 4 === 0 ? 60 : 84); }
+    if (war && (s16 === 4 || s16 === 12)) snare(t, fin ? .55 : .45);
+    if (war && bar % 4 === 3 && FILL[s16]) tom(t, FILL[s16] * .6, s16 % 4 === 2 ? 190 : 130);
+    if (fin && s16 % 2 === 1) drum(t, .18, null, 95);
     if (phase === "dev" && s16 === 12 && bar % 2) snare(t, .25);
-    if (s16 === 0 && bar % 4 === 0 && war) cymbal(t, phase === "final" ? .45 : .3);
-    if (s16 === 0 && bar % 8 === 0 && (phase === "final" || phase === "menu")) gong(t, .28);
-    // 低音弦：八分音符推进（发育期每拍一下）
+    if (s16 === 0 && bar % 4 === 0 && war) cymbal(t, fin ? .5 : .35);
+    if (s16 === 0 && bar % 8 === 0 && (fin || phase === "menu")) gong(t, .3);
+    // 战吼：开战后每两小节一声，决战时每小节
+    if (war && s16 === 0 && (fin || bar % 2 === 1)) chant(t, fin ? .7 : .55, noteHz(ROOTS[bar % 8] - 5));
+    if (fin && s16 === 8 && bar % 2 === 0) chant(t, .45, noteHz(ROOTS[bar % 8] - 5), .22);
+    // 低音弦：战时八分音符推进；发育期每拍一下；菜单持续低音
     const rootDeg = ROOTS[bar % 8];
-    if ((war && s16 % 2 === 0) || (!war && s16 % 4 === 0)) { const oct = s16 % 8 === 6 && war ? 5 : 0; bass(t, noteHz(rootDeg + oct), st * (war ? 1.8 : 3.4), s16 % 4 === 0 ? .6 : .4); }
+    if (war ? s16 % 2 === 0 : s16 % 4 === 0) { const oct = s16 % 8 === 6 && war ? 5 : 0; bass(t, noteHz(rootDeg + oct), st * (war ? 1.8 : 3.4), s16 % 4 === 0 ? .65 : .42); }
+    if (phase === "menu" && s16 === 0 && bar % 2 === 0) drone(t, noteHz(rootDeg - 5), st * 32);
     // 旋律：每两小节一句；第 7、8 小节（每 8 小节的尾巴）留给鼓
-    if (s16 === 0 && bar % 2 === 0) { const rest = bar % 8 === 6 && phase !== "final"; phrase = rest ? null : PHRASES[Math.floor(Math.random() * PHRASES.length)]; pIdx = 0; pLeft = 0; }
+    if (s16 === 0 && bar % 2 === 0) { const rest = bar % 8 === 6 && !fin; phrase = rest ? null : PHRASES[Math.floor(Math.random() * PHRASES.length)]; pIdx = 0; pLeft = 0; }
     if (phrase && pLeft <= 0 && pIdx < phrase.length) {
-      const [d, len] = phrase[pIdx++], hz = noteHz(d + 5 + (phase === "final" && bar % 4 >= 2 ? 0 : 0)); pLeft = len; const dur = len * st;
-      if (war) { horn(t, hz, dur * .92, phase === "final" ? .62 : .5, prevHz); if (phase === "final") horn(t, hz / 2, dur * .92, .25); if (len >= 6) pipa(t, hz * 2, dur * .9, .18); }
-      else if (phase === "dev") { pipa(t, hz, dur * .95, .4); if (len >= 8) horn(t, hz / 2, dur, .22); }
-      else { horn(t, hz, dur * .92, .4, prevHz); }
+      const [d, len] = phrase[pIdx++], hz = noteHz(d + 5); pLeft = len; const dur = len * st;
+      if (war) { fanfare(t, hz, dur * .92, fin ? .7 : .58, prevHz); if (len >= 6) pipa(t, hz * 2, dur * .9, .16); }
+      else if (phase === "dev") { horn(t, hz, dur * .9, .4, prevHz); if (len >= 6) pipa(t, hz * 2, dur * .8, .22); }
+      else { horn(t, hz, dur * .92, .4, prevHz); if (len >= 8) xiao(t, hz * 2, dur, .18); }
       prevHz = hz;
     }
     pLeft--;
@@ -200,15 +239,16 @@ const SFX = {
   tap: t => wood(t, .25, 1300, sfxBus),
   deal: t => { qin(t, noteHz(12), .5, 1.2, sfxBus); qin(t + .09, noteHz(14), .45, 1.4, sfxBus); },
   rare: t => { qin(t, noteHz(10), .5, 1.6, sfxBus); qin(t + .08, noteHz(12), .5, 1.6, sfxBus); qin(t + .16, noteHz(15), .55, 2.2, sfxBus); gong(t, .25, sfxBus); },
-  order: t => { drum(t, .45, sfxBus, 80); drum(t + .16, .35, sfxBus, 80); },
-  battle: t => { drum(t, .7, sfxBus); clash(t + .05, .55, sfxBus); clash(t + .32, .4, sfxBus); drum(t + .3, .5, sfxBus); },
+  order: t => { drum(t, .5, sfxBus, 80); drum(t + .16, .4, sfxBus, 80); horn(t + .05, noteHz(10), .35, .35); },
+  battle: t => { taiko(t, .8, sfxBus); clash(t + .05, .55, sfxBus); clash(t + .32, .4, sfxBus); drum(t + .3, .5, sfxBus); },
+  clash: t => { taiko(t, .9, sfxBus); clash(t + .04, .6, sfxBus); clash(t + .2, .5, sfxBus); clash(t + .38, .45, sfxBus); drum(t + .28, .5, sfxBus); taiko(t + .5, .6, sfxBus, 52); },
   capture: t => { gong(t, .55, sfxBus); drum(t, .5, sfxBus); },
   lose: t => { gong(t, .5, sfxBus); qin(t + .1, noteHz(2), .5, 2, sfxBus); qin(t + .4, noteHz(0), .5, 2.4, sfxBus); },
   omen: t => { gong(t, .6, sfxBus); qin(t + .5, noteHz(9), .4, 2, sfxBus); qin(t + .75, noteHz(12), .4, 2.4, sfxBus); },
   alert: t => { wood(t, .5, 1000, sfxBus); wood(t + .13, .5, 1000, sfxBus); wood(t + .26, .5, 1000, sfxBus); },
   train: t => { clash(t, .35, sfxBus); drum(t + .05, .4, sfxBus, 90); },
   volley: t => { for (let i = 0; i < 6; i++) { const n = noise(.2), f = ctx.createBiquadFilter(), g = ctx.createGain(); f.type = "highpass"; f.frequency.value = 2500; g.gain.setValueAtTime(.12, t + i * .05); g.gain.exponentialRampToValueAtTime(.001, t + i * .05 + .12); n.connect(f); f.connect(g); out(g, false, sfxBus); n.start(t + i * .05); n.stop(t + i * .05 + .15); } },
-  phase: t => { gong(t, .6, sfxBus); drum(t + .2, .6, sfxBus); drum(t + .6, .6, sfxBus); drum(t + 1, .7, sfxBus); },
+  phase: t => { gong(t, .6, sfxBus); taiko(t + .2, .7, sfxBus); taiko(t + .6, .7, sfxBus); taiko(t + 1, .85, sfxBus); fanfare(t + .3, noteHz(10), .5, .5); fanfare(t + .85, noteHz(12), .9, .55); },
   win: t => { [0, 2, 4, 7, 9, 12].forEach((d, i) => qin(t + i * .14, noteHz(d + 5), .5, 2.5, sfxBus)); gong(t + .9, .5, sfxBus); }
 };
 let lastSfx = {};

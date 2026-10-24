@@ -45,8 +45,13 @@ function decide(sim, pid, salt) {
     let a = null;
     const cap = mine.includes(st.capital) ? st.capital : mine[0];
     if (["harvest", "mine", "settle"].includes(k)) a = { r: best(mine, i => R[i].pop / 1000 - R[i].mine * 3 + (R[i].harvestUntil > sim.t ? -9 : 0) + (k === "settle" && R[i].pop >= R[i].cap ? -99 : 0)) };
-    else if (k === "tax" || k === "trade" || k === "golden") a = (k === "trade" ? st.food > 120 : true) ? {} : null;
-    else if (k === "recruit" || k === "wall" || k === "heaven") a = { r: best(frontier.length ? frontier : mine, i => threat(i) - R[i].troops / 2) };
+    else if (k === "tax" || k === "trade" || k === "golden" || k === "granary" || k === "feast" || k === "dragon") a = (k === "trade" ? st.food > 120 : k === "dragon" ? sim.armies.some(x => x.owner === pid) : true) ? {} : null;
+    else if (k === "recruit" || k === "wall" || k === "heaven" || k === "rampart" || k === "ironwall" || k === "decoy" || k === "patrol") a = { r: best(frontier.length ? frontier : mine, i => threat(i) - R[i].troops / 2 + (k === "rampart" && R[i].rampart ? -99 : 0)) };
+    else if (k === "conscript") { const t = best(mine, i => R[i].pop); a = t != null && R[t].pop > 2500 ? { r: t } : null; }
+    else if (k === "march") { const ar = sim.armies.find(x => x.owner === pid); a = ar ? { army: ar.id } : null; }
+    else if (k === "blockade" || k === "locust") { const ps = sim.order.filter(p => p !== pid && sim.P[p].alive && sim.relOf(pid, p) === "war"); a = ps.length ? { p: ps[Math.floor(rnd(6) * ps.length)] } : null; }
+    else if (k === "raid" || k === "rumor" || k === "mandate") { const t = best(R.map((x, i) => i).filter(i => hostile(R[i].owner) && sim.visible(pid, i) && (k !== "mandate" || sim.P[R[i].owner].capital !== i)), i => R[i].pop); a = t != null ? { r: t } : null; }
+    else if (k === "storm") { const t = best(R.map((x, i) => i).filter(i => hostile(R[i].owner) && sim.visible(pid, i)), i => R[i].troops); a = t != null ? { r: t } : null; }
     else if (k === "beacon") a = { r: cap };
     else if (k === "rally") { const t = best(frontier, threat); a = t != null && threat(t) > R[t].troops ? { r: t } : null; }
     else if (k === "pioneer") { const t = mine.flatMap(i => M[i].adj).find(b => !R[b].owner && !R[b].beast && !R[b].troops && R[b].trait !== "ruin"); a = t != null ? { r: t } : null; }
@@ -59,7 +64,7 @@ function decide(sim, pid, salt) {
     else if (["fire", "subvert", "quake", "plague", "flood", "beasts", "meteor"].includes(k)) {
       const t = best(R.map((x, i) => i).filter(i => hostile(R[i].owner) && sim.visible(pid, i)), i => R[i].troops);
       a = t != null ? { r: t } : null;
-    } else if (k === "cavalry") a = null;
+    } else if (k === "cavalry" || k === "stealth") a = null;
     if (a && rnd(7) < .8) { out.push({ type: "card", a: { h: c.h, ...a } }); return out; }
   }
   // 扩张：打无主地（普通兵 + 特殊兵一起算）
@@ -75,6 +80,15 @@ function decide(sim, pid, salt) {
     }
   }
   if (!dev) {
+    // 半路截杀：有敌军正朝我的城来，而我别处有足够兵力
+    for (const e of sim.armies) {
+      if (!hostile(e.owner) || !sim.armyVisibleTo(e, pid) || e.hunt) continue;
+      const T = e.path[e.idx + 1]; if (T == null || R[T].owner !== pid) continue;
+      if (sim.armies.some(x => x.owner === pid && x.hunt === e.id)) continue;
+      const need = e.troops * e.atk * 1.4 + 3;
+      const src = best(mine.filter(i => i !== T && R[i].troops - 3 >= need), i => -(sim.segLen ? 0 : 0) - M[i].adj.includes(T) ? 1 : 0);
+      if (src != null && rnd(17 + e.id) < .7) { out.push({ type: "move", a: { from: src, hunt: e.id, n: Math.floor(Math.min(R[src].troops - 3, need * 1.3)) } }); return out; }
+    }
     // 宣战：偶尔对最弱的邻居
     if (rnd(9) < .04) {
       const ns = new Set(frontier.flatMap(i => M[i].adj.map(b => R[b].owner)).filter(o => o && o !== pid && sim.relOf(pid, o) === "peace"));
