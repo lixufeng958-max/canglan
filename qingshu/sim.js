@@ -15,11 +15,11 @@ const COLORS = ["#E0533F", "#2FA38F", "#E3A72F", "#8B67D6", "#4C8FE0", "#D46FA8"
 const CARDS = {
   1: { name: "侍卫", n: 5, tgt: "other", guess: true, desc: "指一名玩家并猜他手里的牌（不能猜侍卫）。猜中他就出局。" },
   2: { name: "道士", n: 2, tgt: "other", desc: "偷看一名玩家的手牌。" },
-  3: { name: "文士", n: 2, tgt: "other", desc: "和一名玩家暗中比牌，数字小的出局。" },
+  3: { name: "侯爷", n: 2, tgt: "other", desc: "和一名玩家暗中比牌，数字小的出局。" },
   4: { name: "侍女", n: 2, tgt: "none", desc: "直到你下一回合前，别人不能对你用牌。" },
-  5: { name: "王子", n: 2, tgt: "any", desc: "让一名玩家（可以是自己）弃掉手牌、重新摸一张。弃掉公主就出局。" },
-  6: { name: "国君", n: 1, tgt: "other", desc: "和一名玩家交换手牌。" },
-  7: { name: "贵妃", n: 1, tgt: "none", desc: "手里同时有王子或国君时，必须打出贵妃。" },
+  5: { name: "太子", n: 2, tgt: "any", desc: "让一名玩家（可以是自己）弃掉手牌、重新摸一张。弃掉公主就出局。" },
+  6: { name: "帝君", n: 1, tgt: "other", desc: "和一名玩家交换手牌。" },
+  7: { name: "皇后", n: 1, tgt: "none", desc: "手里同时有太子或帝君时，必须打出皇后。" },
   8: { name: "公主", n: 1, tgt: "none", desc: "情书的收信人。谁弃掉公主，谁就出局。" }
 };
 const TOKENS = { 2: 7, 3: 5, 4: 4 }; // 赢几轮才算赢
@@ -79,7 +79,7 @@ Sim.prototype.endRound = function (w, why) {
   if (w && this.P[w].tokens >= this.need) { this.over = { w }; this.phase = "over"; this.L(`👑 ${this.name(w)}赢得公主的芳心！`, "all", "phase"); }
 };
 Sim.prototype.knock = function (p, why) { const s = this.S[p]; s.out = true; s.disc.push(...s.hand); s.hand = []; this.L(`✖ ${this.name(p)}出局（${why}）`, "all", "out"); };
-/* 可选目标：活着、没被侍女保护、（除王子外）不是自己 */
+/* 可选目标：活着、没被侍女保护、（除太子外）不是自己 */
 Sim.prototype.targets = function (p, card) {
   const C = CARDS[card]; if (C.tgt === "none") return [];
   return this.order.filter(q => !this.S[q].out && !this.S[q].safe && (C.tgt === "any" || q !== p));
@@ -129,10 +129,10 @@ function botDecide(sim, pid, salt) {
   const left = v => CARDS[v].n - (seen[v] || 0);
   const others = sim.order.filter(q => q !== pid && !sim.S[q].out);
   const pick = (arr, k) => arr[Math.floor(rnd(k) * arr.length)];
-  // 决定打哪张：绝不打公主；贵妃能留就留；小牌优先打
+  // 决定打哪张：绝不打公主；皇后能留就留；小牌优先打
   let card = hand.includes(8) ? hand.find(v => v !== 8) : hand.slice().sort((a, b) => a - b)[0];
   if (hand.includes(7) && hand.some(v => v !== 7 && v <= 4)) card = hand.find(v => v !== 7 && v <= 4);
-  // 文士：只有自己另一张够大才比
+  // 侯爷：只有自己另一张够大才比
   if (card === 3 && hand.some(v => v !== 3) && hand.find(v => v !== 3) < 5 && hand.some(v => v !== 3 && v !== 8)) card = hand.find(v => v !== 3 && v !== 8) || card;
   const ts = sim.targets(pid, card);
   const out = { card };

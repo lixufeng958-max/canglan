@@ -18,6 +18,12 @@ const shots = path.join(__dirname, "shots"); fs.mkdirSync(shots, { recursive: tr
   await page.locator("#rStart").tap(); await page.waitForSelector("#sGame:not([hidden])");
   await page.waitForTimeout(800); await page.screenshot({ path: path.join(shots, "qs-game.png") });
   let fails = 0, myPlays = 0, shot = false;
+  // 新手教程：第一次进会自动出现，前 3 步点下一步，第 4、5 步靠下面出牌推进，最后再点完
+  await page.waitForTimeout(1200);
+  if (!(await page.evaluate(() => TUT.on))) { console.log("教程没有自动出现"); fails++; }
+  else { for (let k = 0; k < 3; k++) { await page.locator("#tutNext").tap(); await page.waitForTimeout(200); } await page.screenshot({ path: path.join(shots, "qs-tut.png") }); }
+  await page.locator("#bCards").tap(); await page.waitForTimeout(400); await page.screenshot({ path: path.join(shots, "qs-cards.png") });
+  if ((await page.locator(".gitem").count()) !== 8) { console.log("角色一览不是 8 张"); fails++; } await page.locator(".sh-head .x").tap(); await page.waitForTimeout(200);
   // 打到结束：轮到我就点第一张能打的牌，选第一个目标/猜测，打出
   for (let i = 0; i < 1200; i++) {
     const st = await page.evaluate(() => G ? { over: !!G.sim.over, my: G.sim.phase === "play" && G.sim.cur() === G.me && !G.sim.S[G.me].out, round: G.sim.round } : null);
@@ -33,6 +39,7 @@ const shots = path.join(__dirname, "shots"); fs.mkdirSync(shots, { recursive: tr
       if (!shot) { await page.screenshot({ path: path.join(shots, "qs-play.png") }); shot = true; }
       if (await page.locator("#go").isDisabled()) { console.log("打出按钮没有启用"); fails++; await page.screenshot({ path: path.join(shots, "qs-fail.png") }); break; }
       await page.locator("#go").tap(); myPlays++; await page.waitForTimeout(400);
+      if (myPlays === 1) { await page.waitForTimeout(400); const i = await page.evaluate(() => TUT.on ? TUT.i : -1); if (i !== 5) { console.log("教程没跟着出牌推进到第 6 步，现在是", i + 1); fails++; } for (let k = 0; k < 3 && await page.evaluate(() => TUT.on); k++) { await page.locator("#tutNext").tap(); await page.waitForTimeout(200); } }
     } else await page.waitForTimeout(400);
   }
   const over = await page.evaluate(() => !!G.sim.over);

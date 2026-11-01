@@ -161,6 +161,20 @@ input{font:inherit;font-size:16px;color:var(--text);background:var(--card);borde
 .hrow .hn{--cc:var(--c1);font-family:var(--display);font-weight:900;color:var(--cc);font-size:18px}
 .hrow b{font-family:var(--display)}.hrow>span:nth-child(3){color:var(--muted);font-size:12px}
 .hrow p{grid-column:1/-1;margin:0;font-size:13px;color:var(--soft)}
+/* 角色一览 */
+.gallery{display:flex;flex-direction:column;gap:10px}
+.gitem{display:grid;grid-template-columns:auto 1fr;gap:12px;align-items:center;border-bottom:1px dashed var(--line);padding-bottom:10px}
+.gitem b{--cc:var(--c1);font-family:var(--display);font-weight:900;font-size:18px;color:var(--cc)}
+.gitem p{margin:4px 0;font-size:14px}.gitem small{color:var(--muted);font-size:12px}
+/* 新手教程 */
+.tut-spot{position:fixed;z-index:34;pointer-events:none;border-radius:10px;box-shadow:0 0 0 9999px rgba(0,0,0,.5),0 0 0 3px var(--gold),0 0 22px 4px rgba(217,169,58,.55);transition:left .25s,top .25s,width .25s,height .25s}
+.tut{pointer-events:none;position:fixed;z-index:36;left:50%;transform:translateX(-50%);bottom:calc(var(--sb) + 250px);width:min(360px,calc(100% - 24px));background:var(--grain),linear-gradient(#3D2733,#241620);border:1.5px solid var(--gold);border-radius:8px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.55);font-family:var(--display)}
+.tut.top{bottom:auto;top:calc(var(--st) + 60px)}
+.tut-n{font-size:11px;letter-spacing:.2em;color:var(--gold);font-weight:700}
+.tut-t{font-size:14.5px;line-height:1.55;margin:4px 0 10px}.tut-t b{color:#FFD65A}
+.tut-b{display:flex;align-items:center;gap:8px}.tut-b button{pointer-events:auto}
+.tut-b .tut-wait{flex:1;text-align:right;font-size:13px;color:var(--soft)}
+.tut-b #tutNext{margin-left:auto}
 @media (orientation: landscape) and (max-height: 520px){.hand{min-height:120px}.card{width:80px;height:116px}.card .art{width:44px;height:44px;margin-top:18px}}
 </style>
 </head>
@@ -184,6 +198,7 @@ input{font:inherit;font-size:16px;color:var(--text);background:var(--card);borde
     </div>
     <div id="authOffline" class="cardbox" hidden><b>联机服务还没配置</b><p class="tip">现在可以先和电脑对战。</p></div>
     <button class="btn ghost block" id="aSolo">单机练习（和电脑打）</button>
+    <div class="row"><button class="btn ghost block" id="aTut">🎓 新手教程</button><button class="btn ghost block" id="aCards">八种角色</button></div>
     <button class="btn ghost block" id="aHelp">玩法说明</button>
     <a class="hub-link" href="../">← 回到游戏大厅</a>
   </div>
@@ -200,6 +215,7 @@ input{font:inherit;font-size:16px;color:var(--text);background:var(--card);borde
     <div class="row"><input id="hCode" placeholder="输入 4 位房间号" maxlength="4" style="text-transform:uppercase"><button class="btn ghost" style="flex:none" id="hJoin">加入</button></div>
     <p class="err" id="hErr"></p>
     <button class="btn ghost block" id="hSolo">单机练习（和电脑打）</button>
+    <div class="row"><button class="btn ghost block" id="hTut">🎓 新手教程</button><button class="btn ghost block" id="hCards">八种角色</button></div>
     <button class="btn ghost block" id="hHelp">玩法说明</button>
     <button class="btn bad block" id="hOut">退出登录</button>
     <a class="hub-link" href="../">← 回到游戏大厅</a>
@@ -225,7 +241,7 @@ input{font:inherit;font-size:16px;color:var(--text);background:var(--card);borde
 </section>
 
 <section class="screen" id="sGame" hidden>
-  <div class="hud"><b id="round">第 1 轮</b><button class="ibtn" id="bLog">战报</button><button class="ibtn" id="bMenu">☰</button></div>
+  <div class="hud"><b id="round">第 1 轮</b><button class="ibtn" id="bCards">角色</button><button class="ibtn" id="bLog">战报</button><button class="ibtn" id="bMenu">☰</button></div>
   <div class="toasts" id="toasts"></div>
   <div class="table">
     <div class="opps" id="opps"></div>
