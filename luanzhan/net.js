@@ -112,6 +112,7 @@ FireNet.prototype.joinRoom = async function (code) {
       const s = await tx.get(ref);
       if (!s.exists()) throw new Error("没有这个房间号");
       const r = s.data();
+      if (r.game) throw new Error("这是别的游戏的房间号");
       if (r.players.some(p => p.id === this.user.uid)) return r;
       if (r.status !== "lobby") throw new Error("这局已经开始了");
       if (r.players.length >= 6) throw new Error("房间已满（最多 6 人）");

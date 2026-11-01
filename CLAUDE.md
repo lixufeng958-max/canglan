@@ -6,11 +6,12 @@
 - 改完后要给出能直接部署的结果，并说明怎么更新。
 
 ## 这是什么
-网站根目录是一个**游戏大厅**（`index.html`，总入口，列出所有游戏），每个游戏放在自己的文件夹里。目前只有一个游戏：
-`luanzhan/` = 苍澜·乱战，一个纯前端网页游戏（PWA），**写实地形地图、深色战争风界面**的实时国战卡牌策略游戏（v17 起不再是水墨风）。
+网站根目录是一个**游戏大厅**（`index.html`，总入口，列出所有游戏），每个游戏放在自己的文件夹里。目前两个游戏：
+- `qingshu/` = **情书·宫廷传书**：回合制猜牌小游戏（16 张牌 8 种角色，2–4 人，先集满 ❤ 者胜）。文件：`sim.js`（规则引擎 + 电脑 `botDecide`，导出 `window.QS`）、`app.js`（流程与界面）、`art.js`（八种牌的 SVG 徽记）、`net.js`（从苍澜复制并改：房间带 `game:"qs"` 标记，资料存在用户文档的 `qs` 字段下）、`index.html`、`sw.js`（缓存 `qingshu-vN`）。不是锁步实时推演：每次收到事件列表就按服务器时间排序**从头重算整局**（几百条事件瞬间算完），只有房主代电脑出牌、轮次结束 4.5 秒后发 `next` 事件开下一轮。隐藏信息（手牌）只是界面不显示，引擎里所有人都算得出来——朋友间玩够用。测试：`node tests/qs-replay.js`（60 局电脑互打重放一致）、`node tests/qs-ui.js`（单机自动打完一整局）。
+- `luanzhan/` = **苍澜·乱战**，一个纯前端网页游戏（PWA），**写实地形地图、深色战争风界面**的实时国战卡牌策略游戏（v17 起不再是水墨风）。
 - 线上地址：https://donglin-luanzhan.netlify.app （大厅）、https://donglin-luanzhan.netlify.app/luanzhan/ （游戏）。Netlify 团队 lin-ma-c62r488，站点 donglin-luanzhan，已连 GitHub 仓库 main 分支，推送即自动上线。
 - **加新游戏**：新建一个文件夹放进去（文件里只用相对路径），再在根 `index.html` 的 `<main>` 里照着苍澜那张卡片抄一张（封面图、名字、简介、链接）。根目录的 `sw.js` 只缓存大厅本身，游戏目录里的请求交给各游戏自己的 `sw.js`。
-- 联机：Firebase（项目 tianxia-a53f0），邮箱密码登录 + Firestore。配置在 `config.js`，规则在 `firestore.rules`。
+- 联机：Firebase（项目 tianxia-a53f0），邮箱密码登录 + Firestore，**两个游戏共用账号与 `rooms` 集合**（情书的房间有 `game:"qs"` 字段，苍澜的没有，互相拒绝加入）。配置在各游戏的 `config.js`，规则在 `luanzhan/firestore.rules`。
 - 没有构建步骤：所有文件原样上传即可。改了游戏里任何文件都要把 `luanzhan/sw.js` 里的 `CACHE` 版本号 +1（改大厅则是根目录 `sw.js`），否则手机会读旧缓存。
 
 ## 文件（根目录）
