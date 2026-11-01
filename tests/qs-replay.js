@@ -18,10 +18,10 @@ for (let seed = 1; seed <= 60; seed++) {
     turns++;
   }
   if (!sim.over) { console.log("seed", seed, "没打完"); fails++; continue; }
-  rounds += sim.round; spies += sim.log.filter(l => l.text.includes("间谍立功")).length;
+  rounds += sim.round; spies += sim.log.filter(l => l.text.includes("细作立功")).length;
   const B = new QS.Sim(cfg); B.run(events);
   const st = s => JSON.stringify([s.round, s.S, s.P, s.deck, s.aside, s.turn, s.phase, s.over, s.log.length]);
   if (st(B) !== st(sim)) { console.log("seed", seed, "重放不一致"); fails++; }
 }
-console.log(`60 局（2–6 人），共 ${rounds} 轮 ${turns} 手，大臣挑牌 ${chanc} 次，间谍立功 ${spies} 次，${fails ? "失败 " + fails : "全部一致、全部正常结束"}`);
+console.log(`60 局（2–6 人），共 ${rounds} 轮 ${turns} 手，国公挑牌 ${chanc} 次，细作立功 ${spies} 次，${fails ? "失败 " + fails : "全部一致、全部正常结束"}`);
 process.exit(fails ? 1 : 0);

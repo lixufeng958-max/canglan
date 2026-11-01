@@ -50,7 +50,7 @@ const shots = path.join(__dirname, "shots"); fs.mkdirSync(shots, { recursive: tr
   const again = page.locator("#eAgain");
   if (!(await again.count())) { console.log("结束后没有再来一局按钮"); fails++; }
   else { await again.tap(); await page.waitForSelector("#sRoom:not([hidden])", { timeout: 8000 }).catch(() => { console.log("再来一局没回到房间"); fails++; }); }
-  console.log(`我出了 ${myPlays} 手牌，大臣挑牌 ${keeps} 次，${over ? "一局打完" : "没打完"}`);
+  console.log(`我出了 ${myPlays} 手牌，国公挑牌 ${keeps} 次，${over ? "一局打完" : "没打完"}`);
   await br.close();
   if (errors.length) { console.log("页面报错：\n" + [...new Set(errors)].slice(0, 8).join("\n")); fails++; }
   console.log(fails ? `失败 ${fails} 项` : "情书界面测试通过"); process.exit(fails ? 1 : 0);
