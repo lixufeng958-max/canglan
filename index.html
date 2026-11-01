@@ -308,6 +308,25 @@ input::placeholder{color:var(--muted)}
 .ibtn:active{transform:translateY(2px);box-shadow:0 0 0 #6A6150}
 .bottom{background:linear-gradient(rgba(16,18,22,0),rgba(16,18,22,.95) 40%)}
 .bottom::after{content:"";position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--brass)}
+/* ---------- 新手教程 ---------- */
+.tut-spot{position:fixed;z-index:34;pointer-events:none;box-shadow:0 0 0 9999px rgba(0,0,0,.5),0 0 0 3px var(--brass),0 0 22px 4px rgba(217,169,58,.55);transition:left .25s,top .25s,width .25s,height .25s;animation:tutpulse 1.4s ease-in-out infinite}
+@keyframes tutpulse{50%{box-shadow:0 0 0 9999px rgba(0,0,0,.5),0 0 0 5px var(--brass),0 0 30px 8px rgba(217,169,58,.7)}}
+.tut{pointer-events:none;position:fixed;z-index:36;left:50%;transform:translateX(-50%);bottom:calc(var(--sb) + 132px);width:min(360px,calc(100% - 24px));background:var(--grain),linear-gradient(#2E323B,#1E2128);border:1.5px solid var(--brass);border-radius:8px;padding:12px 14px;box-shadow:0 10px 30px rgba(0,0,0,.55);font-family:var(--display)}
+.tut.top{bottom:auto;top:calc(var(--st) + 66px)}
+.tut-n{font-size:11px;letter-spacing:.2em;color:var(--brass);font-weight:700}
+.tut-t{font-size:14.5px;line-height:1.55;margin:4px 0 10px}
+.tut-t b{color:#FFD65A}
+.tut-b{display:flex;align-items:center;gap:8px}
+.tut-b button{pointer-events:auto}
+.tut-b .tut-wait{flex:1;text-align:right;font-size:13px;color:var(--ink-soft);animation:tutblink 1.2s ease-in-out infinite}
+.tut-b #tutNext{margin-left:auto}
+@keyframes tutblink{50%{opacity:.45}}
+.tut.pop{animation:tutpop .3s ease-out}
+@keyframes tutpop{from{transform:translateX(-50%) translateY(10px);opacity:0}}
+@media (orientation: landscape) and (max-height: 520px){.tut{left:var(--gl);transform:none;bottom:calc(var(--sb) + 12px);width:min(46vw,380px)}.tut.top{top:calc(var(--st) + 50px)}.tut.pop{animation:none}}
+/* ---------- 战败 ---------- */
+.defeat .dtitle{font-family:var(--brush);font-weight:900;font-size:56px;text-align:center;letter-spacing:.3em;color:var(--bad);text-shadow:0 0 24px rgba(255,80,60,.5);margin:4px 0 2px}
+.chip.phase.spec{background:#3A3F4A;border-color:#6A6150}
 /* 兵种属性条 */
 .ustats{display:flex;gap:4px;margin-top:3px}
 .ustat{font-size:10px;color:var(--ink-soft);font-family:var(--num)}
@@ -344,6 +363,7 @@ input::placeholder{color:var(--muted)}
     </div>
     <div id="authOffline" class="card" hidden><b>联机服务还没配置</b><p class="tip" style="margin:6px 0 0">需要先把 Firebase 配置填进 config.js。现在可以先和电脑对战试玩。</p></div>
     <button class="btn ghost block" id="aSolo">单机练习（和电脑打）</button>
+    <button class="btn ghost block" id="aTut">🎓 新手教程</button>
   </div>
 </section>
 
@@ -366,7 +386,7 @@ input::placeholder{color:var(--muted)}
     <div class="row"><input id="hCode" placeholder="输入 4 位房间号" maxlength="4" style="text-transform:uppercase"><button class="btn ghost" style="flex:none" id="hJoin">加入</button></div>
     <p class="err" id="hErr"></p>
     <button class="btn ghost block" id="hSolo">单机练习（和电脑打）</button>
-    <button class="btn ghost block" id="hHelp">玩法说明</button>
+    <div class="row"><button class="btn ghost block" id="hTut">🎓 新手教程</button><button class="btn ghost block" id="hHelp">玩法说明</button></div>
     <button class="btn bad block" id="hOut">退出登录</button>
   </div>
 </section>

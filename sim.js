@@ -327,7 +327,7 @@ Sim.prototype.reset = function () {
   cfg.players.forEach((p, i) => {
     const unit = UNITS[p.unit] ? p.unit : UNIT_KEYS[(hstr(p.id) + i) % UNIT_KEYS.length];
     const st = { id: p.id, unit, name: p.name, color: p.color || COLORS[i], bot: !!p.bot, gold: 60, food: 90, hand: [], hseq: 0, draws: 0, pity: 0,
-      owed: DRAW.startCards, bought: 0, known: new Uint8Array(map.regions.length), snap: {}, alive: true, capital: map.starts[i], renown: 0, got: [], famineUntil: 0, locustUntil: 0, dragonUntil: 0 };
+      owed: DRAW.startCards, bought: 0, known: new Uint8Array(map.regions.length), snap: {}, alive: true, capital: map.starts[i], renown: 0, got: [], famineUntil: 0, locustUntil: 0, dragonUntil: 0, diedAt: -1, maxRows: 1, kills: 0, taken: 0 };
     this.P[p.id] = st;
     const cap = map.starts[i];
     this.own(cap, p.id, 0); this.R[cap].loyalty = 80; this.R[cap].home = unit; this.R[cap].el[unit] = 14;
@@ -621,7 +621,7 @@ Sim.prototype.arrive = function (a, r) {
 Sim.prototype.capture = function (r, p, was, vis) { // 占领后：等待新主人决定如何处置百姓
   const R = this.R[r], st = this.P[p];
   R.policy = "military"; R.loyalty = Math.max(0, 35 + (st.renown <= -10 ? -10 : st.renown >= 10 ? 10 : 0));
-  st.known[r] = 1;
+  st.known[r] = 1; st.taken++;
   this.FX("capture", { r, by: p, vis });
   this.L(was ? `${this.pname(p)}攻占了${this.pname(was)}的${this.rname(r)}` : `${this.pname(p)}占领了${this.rname(r)}`, was ? "battle" : "info", vis, r);
   if (R.pop >= 300 && R.trait !== "ruin") { R.pend = { by: p, until: this.t + 30 }; this.L(`攻下${this.rname(r)}，城中 ${Math.round(R.pop)} 居民听候发落`, "decide", [p], r); }
@@ -629,9 +629,10 @@ Sim.prototype.capture = function (r, p, was, vis) { // 占领后：等待新主�
 Sim.prototype.checkDead = function (pid) {
   if (this.R.some(R => R.owner === pid)) return;
   const st = this.P[pid]; if (!st.alive) return;
-  st.alive = false;
+  st.alive = false; st.diedAt = this.t;
   this.armies.forEach(a => { if (a.owner === pid) a.troops = 0; });
   this.L(`${st.name}失去了所有领地，退出了争霸`, "diplo", "all");
+  this.L(`☠ 国破：你失去了所有领地`, "defeat", [pid]);
 };
 Sim.prototype.fixCapital = function (pid) {
   const st = this.P[pid]; if (this.R[st.capital] && this.R[st.capital].owner === pid) return;
@@ -945,7 +946,8 @@ Sim.prototype.tick = function () {
   const t = this.t;
   if (t === this.cfg.devSec) this.L("⚔ 发育期结束！从现在起可以进攻、宣战，抽签和市集出现所有类型的卡牌", "phase", "all");
   if (t === this.cfg.totalSec - RULES.finalSec) this.L("🔥 最后决战！迷雾散尽，天下城池与军队一览无余", "phase", "all");
-  if (this.final()) { for (const id of this.order) { const st = this.P[id]; if (!st.alive) continue; if (t % 3 === 0 || t === this.cfg.totalSec - RULES.finalSec) for (let r = 0; r < this.R.length; r++) { st.known[r] = 1; this.snapshot(id, r); } } }
+  // 决战期全图公开；出局的玩家转为观战，也看全图
+  for (const id of this.order) { const st = this.P[id]; if (!(this.final() || !st.alive)) continue; if (t % 3 === 0 || t === this.cfg.totalSec - RULES.finalSec) for (let r = 0; r < this.R.length; r++) { st.known[r] = 1; this.snapshot(id, r); } }
   this.stepArmies();
   for (const id of this.order) {
     const st = this.P[id]; if (!st.alive) continue;
@@ -973,6 +975,7 @@ Sim.prototype.tick = function () {
     else if (!R.owner && R.beast > 0 && t % 40 === 0) R.beast += 1;
   });
   if (t % 30 === 0) this.unrest();
+  if (t % 5 === 0) for (const id of this.order) { const st = this.P[id]; if (st.alive) st.maxRows = Math.max(st.maxRows, this.rows(id).length); }
   if (t >= this.W.next) this.omen();
   this.checkHegemony();
   this.checkEnd();

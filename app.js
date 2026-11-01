@@ -86,6 +86,16 @@ $("#hJoin").onclick = async () => {
 };
 $("#hSolo").onclick = () => startSolo();
 $("#hHelp").onclick = () => openHelp();
+$("#hTut").onclick = () => startTutorial();
+$("#aTut").onclick = () => startTutorial();
+// 新手教程：开一局单机（自动加一个电脑），进去后一步步教
+async function startTutorial() {
+  TUT.pending = true;
+  const c = await LOCAL.createRoom({ len: 25, dev: 5 });
+  await LOCAL.updateRoom(c, r => { r.players.push({ id: "bot-tut", name: LZNet.BOT_NAMES[0], color: LZ.COLORS[1], bot: true, unit: "daji" }); r.players[0].unit = "hubao"; });
+  await LOCAL.startRoom(c);
+  enterRoom(LOCAL, c);
+}
 $("#hOut").onclick = async () => { await ONLINE.signOut(); };
 $("#hRename").onclick = () => {
   const body = box(`<input id="rnI" maxlength="8" placeholder="新的昵称"><button class="btn block" id="rnGo">保存</button>`);
@@ -177,6 +187,10 @@ function startGame(net, room) {
   G.unRoom = net.watchRoom(room.code, r => { if (r) G.room = { ...G.room, ...r, startAt: r.startAt || G.room.startAt }; });
   G.botTimer = setInterval(runBots, 1200);
   renderHand();
+  tutEnd();
+  // 第一次玩单机，或者从首页点了「新手教程」→ 开局后自动开始教程
+  let first = false; try { first = !localStorage.getItem("lz.tutDone"); } catch {}
+  if (net.mode === "local" && (TUT.pending || first)) { TUT.pending = false; setTimeout(() => { if (G === game) tutStart(); }, 4500); }
   const game = G; requestAnimationFrame(() => loop(game)); // 每一局只有自己的这一条画面循环
 }
 function onResize() { if (!G) return; G.rd.resize(); clearTimeout(G.rsT); G.rsT = setTimeout(() => G && G.rd.resize(), 350); } // 转屏后布局要过一会才稳定，再量一次
@@ -184,6 +198,7 @@ addEventListener("orientationchange", onResize);
 if (window.visualViewport) visualViewport.addEventListener("resize", onResize);
 function leaveGame() {
   if (!G) return;
+  tutEnd();
   G.unEv && G.unEv(); G.unRoom && G.unRoom(); clearInterval(G.botTimer); removeEventListener("resize", onResize);
   if (G.rd) G.rd.destroy(); // 卸掉这一局地图上的点击监听，避免下一局叠加
   document.querySelectorAll(".scrim").forEach(s => s.remove()); document.body.classList.remove("picking"); $("#banner").hidden = true;
@@ -255,6 +270,7 @@ function loop(game) {
   if (now < 0) $("#cdN").textContent = startAt() ? Math.ceil(-now) : "…";
   G.rd.hl = highlight(); G.rd.pend = G.pend;
   G.rd.draw(Math.max(0, now));
+  if (TUT.on) tutTick();
   fxSounds(now);
   const t = performance.now();
   if (t - G.lastHud > 250) { G.lastHud = t; updateHud(now); pumpLog(); if (G.sim.over && !G.ended) endGame(); }
@@ -307,12 +323,27 @@ function updateHud(now) {
   $("#dDip").hidden = !offers; $("#dDip").textContent = offers;
   $("#dLog").hidden = !G.unread; $("#dLog").textContent = G.unread;
   // 手牌/商店在资源变化时刷新可用状态
-  const sig = st.hand.map(c => c.h).join(",") + "|" + dev;
+  const sig = st.hand.map(c => c.h).join(",") + "|" + dev + "|" + st.alive;
   updateDealRing(); updateOmens();
   const busy = performance.now() - lastTouch < 900; // 手指正在点按时不重建界面，避免点不中
   if (sig !== G.handSig && !busy) { G.handSig = sig; renderHand(); }
   if (G.openSheet && G.openSheet.refresh && !busy) G.openSheet.refresh();
-  if (!st.alive && !G.deadShown) { G.deadShown = true; toast("你的领地已全部失守。可以继续观战。", "alert"); }
+  if (!st.alive && !G.deadShown) { G.deadShown = true; showDefeat(); }
+  if (!st.alive && !s.over) { $("#cPhaseL").textContent = "观战中"; $("#cPhase").className = "chip phase spec"; }
+}
+/* ---------- 战败：领地全失 ---------- */
+function showDefeat() {
+  const s = G.sim, st = s.P[G.me], alive = s.order.filter(p => s.P[p].alive);
+  AU("play", "lose"); if (navigator.vibrate) navigator.vibrate([200, 100, 300]);
+  closeSheets(); setMode(null);
+  const body = box(`<div class="defeat"><div class="dtitle">国 破</div><div class="tip" style="text-align:center">你失去了所有领地，退出了争霸</div>
+    <div class="kv" style="margin-top:12px"><div><small>坚持了</small><b class="num">${mmss(st.diedAt >= 0 ? st.diedAt : s.t)}</b></div><div><small>最多时领地</small><b class="num">${st.maxRows}</b></div><div><small>攻下城池</small><b class="num">${st.taken}</b></div><div><small>还在争霸</small><b class="num">${alive.length}</b></div></div>
+    <div class="tip" style="margin-top:10px">${alive.length ? "剩下的人：" + alive.map(p => `<span class="owner"><i style="background:${s.P[p].color}"></i>${esc(s.P[p].name)}</span>`).join("　") : ""}</div>
+    <div class="tip">留下观战的话，<b>整张地图对你公开</b>，能看到所有人的城池和军队，直到这局结束。</div>
+    <button class="btn block" id="dStay">留下观战</button><button class="btn ghost block" id="dBack">返回首页</button></div>`);
+  const sh = sheet("兵败如山倒", body);
+  body.querySelector("#dStay").onclick = () => { sh.close(); toast("观战中：整张地图已对你公开", "good"); renderHand(); };
+  body.querySelector("#dBack").onclick = () => { sh.close(); leaveGame(); };
 }
 function pumpLog() {
   const s = G.sim;
@@ -324,6 +355,7 @@ function pumpLog() {
     if (l.kind === "watch" && s.dev()) { G.unread++; continue; } // 发育期的行军动静只记进战报
     if (l.kind === "omen") { showOmen(l); G.unread++; continue; }
     if (l.kind === "decide") { toast(l.text + "（点这里处置）", "watch", l.r); if (!document.querySelector(".scrim:not(.light)") && !G.mode) openPolicy(l.r); G.unread++; continue; }
+    if (l.kind === "defeat") continue; // 战败有专门的界面
     if (["alert", "watch", "offer", "ping", "battle", "phase", "diplo", "disaster", "error", "info", "policy", "massacre", "sac", "hege"].includes(l.kind)) {
       const kind = l.kind === "alert" || l.kind === "error" || l.kind === "massacre" || l.kind === "hege" ? "alert" : l.kind === "watch" ? "watch" : l.kind === "ping" ? "ping" : l.kind === "phase" ? "good" : "";
       toast(l.text, kind, l.r);
@@ -349,6 +381,7 @@ function updateOmens() {
 }
 function send(type, a) {
   if (!G || G.sim.over) return;
+  tutHit("send:" + type);
   const cid = Math.random().toString(36).slice(2, 10);
   G.pend.push({ cid, type, a, at: performance.now() }); // 先在画面上显示“已下令”，不用等网络
   if (type === "move" || (type === "card" && a.from != null)) AU("play", "order");
@@ -433,6 +466,7 @@ function elLine(el, home) {
 function loyTxt(v) { return v >= 70 ? "归心" : v >= 50 ? "安定" : v >= 30 ? "不满" : v >= 15 ? "怨声载道" : "濒临暴动"; }
 function openRegion(r) {
   const s = G.sim, me = G.me, g = s.map.regions[r];
+  tutHit("region", r);
   const draw = () => {
     const R = s.R[r], own = R.owner === me, vis = s.visible(me, r), snap = s.P[me].snap[r];
     const b = document.createElement("div"); b.style.display = "contents";
@@ -521,6 +555,7 @@ function startHunt(armyId) {
 
 /* ---------- 出兵 ---------- */
 function startMoveFrom(from) {
+  tutHit("moveFrom");
   setMode({ valid: { regions: G.sim.R.map((x, i) => i).filter(i => i !== from) }, pick: ({ r }) => { setMode(null); openTroops(from, r); } }, `从${G.sim.map.regions[from].name}出兵：点目标地区`);
 }
 function startMoveTo(to) {
@@ -595,6 +630,7 @@ function openTroops(from, to, card, unit, ex = {}) {
   };
   wrap.append(draw());
   const sh = sheet(kind, wrap, { onClose: () => { if (G) G.lastPick = null; } });
+  tutHit("troops");
 }
 
 /* ---------- 预警 ---------- */
@@ -635,6 +671,7 @@ function cardArrive(c, how) {
 function renderHand() {
   if (!G) return;
   const st = G.sim.P[G.me], dev = G.sim.dev(), h = $("#hand"); h.innerHTML = "";
+  if (!st.alive) { h.append(el(`<div class="empty-hand">☠ 你已出局，正在观战。整张地图对你公开。</div>`)); return; }
   const sb = el(`<button class="shopbtn deal"><svg class="ring" viewBox="0 0 40 40"><circle cx="20" cy="20" r="17"/><circle class="fg" cx="20" cy="20" r="17"/></svg><b class="num" id="dealS">--</b><small>秒后发牌</small><small class="num">${st.hand.length}/${HAND_MAX}</small></button>`);
   sb.onclick = () => openAcquire(); h.append(sb);
   if (!st.hand.length) h.append(el(`<div class="empty-hand">卡牌每 ${DRAW.dealEvery} 秒自动发一张，不用操作。想要更多可以去市集或祭坛。</div>`));
@@ -791,8 +828,9 @@ $("#bLog").onclick = () => {
   sheet("战报", body);
 };
 $("#bMenu").onclick = () => {
-  const body = box(`<div class="seg" id="mSnd"><button data-k="music" aria-pressed="${LZAudio.music}">🎵 背景音乐 ${LZAudio.music ? "开" : "关"}</button><button data-k="sfx" aria-pressed="${LZAudio.sfx}">🔊 音效 ${LZAudio.sfx ? "开" : "关"}</button></div><div class="tip">手机开着静音键时可能听不到声音。</div><button class="btn ghost block" id="mCap">回到我的都城</button><button class="btn ghost block" id="mHelp">玩法说明</button><button class="btn ghost block" id="mOut">离开（对局会继续，可以随时回来）</button>`);
+  const body = box(`<div class="seg" id="mSnd"><button data-k="music" aria-pressed="${LZAudio.music}">🎵 背景音乐 ${LZAudio.music ? "开" : "关"}</button><button data-k="sfx" aria-pressed="${LZAudio.sfx}">🔊 音效 ${LZAudio.sfx ? "开" : "关"}</button></div><div class="tip">手机开着静音键时可能听不到声音。</div><button class="btn ghost block" id="mCap">回到我的都城</button><button class="btn ghost block" id="mTut">新手教程（在这局里边玩边学）</button><button class="btn ghost block" id="mHelp">玩法说明</button><button class="btn ghost block" id="mOut">离开（对局会继续，可以随时回来）</button>`);
   const sh = sheet("菜单", body);
+  body.querySelector("#mTut").onclick = () => { sh.close(); tutStart(true); };
   body.querySelectorAll("#mSnd button").forEach(b => b.onclick = () => { const k = b.dataset.k, on = !LZAudio[k]; k === "music" ? LZAudio.setMusic(on) : LZAudio.setSfx(on); b.setAttribute("aria-pressed", on); b.textContent = (k === "music" ? "🎵 背景音乐 " : "🔊 音效 ") + (on ? "开" : "关"); });
   body.querySelector("#mCap").onclick = () => { sh.close(); const c = G.sim.P[G.me].capital; const own = mineRegions(); G.rd.focus(own.includes(c) ? c : own[0] ?? c); };
   body.querySelector("#mHelp").onclick = () => { sh.close(); openHelp(); };
@@ -831,6 +869,65 @@ function runBots() {
     const evs = LZBots.decide(G.sim, p, botSalt++);
     evs.forEach(e => G.net.sendEvent(G.code, { by: p, type: e.type, a: e.a }).catch(() => {}));
   }
+}
+
+/* ---------- 新手教程：在真实对局里一步步引导 ----------
+ 每一步要么等玩家做某个操作（wait），要么点「下一步」。聚光灯 .tut-spot 用大阴影把其余画面压暗，
+ 本身不挡点击，所以教程期间照常能玩。 */
+const TUT = { on: false, i: 0, pending: false, manual: false };
+const TUT_STEPS = [
+  { text: "欢迎来到苍澜！发亮的这座带宫殿的城是你的<b>国都</b>。地图可以拖动、双指缩放。<br>先<b>点一下你的国都</b>。", target: "capital", wait: "region" },
+  { text: "这是城池面板。<b>居民</b>越多产出越多；<b>民心</b>太低会叛乱；<b>守军</b>守城；<b>守备</b>是地形、城墙给的加成。国都只产你选的<b>特殊兵种</b>。<br>现在点<b>「出兵」</b>。", target: "#ra", wait: "moveFrom" },
+  { text: "发亮的地区都能去。开局先打<b>相邻的无主之地</b>，有凶兽的要多带兵。<br><b>点一块相邻的地区</b>。", target: null, wait: "troops" },
+  { text: "拖滑块决定派多少兵，下面会告诉你胜算；至少留 1 兵守家。<br>点<b>「出征！」</b>。", target: "#tGo", wait: "send:move" },
+  { text: "军队会沿官道行军，到了自动开打。<br>下面这排是<b>手牌</b>：每 40 秒自动发一张。点一张卡能看说明，再点「使用」。", target: "#hand", wait: null },
+  { text: "顶上是家底：<b>金</b>、<b>粮</b>每分钟自动增加（小字是速度），兵多了会吃粮；<b>民</b>是总人口；<b>名望</b>影响别人对你的态度和百姓的归附。", target: ".res", wait: null },
+  { text: "前 5 分钟是<b>发育期</b>：不能打其他玩家，只能打凶兽、扩张、发展，抓紧占地！发育期一过，攻击和天灾类卡牌就会出现。", target: "#cPhase", wait: null },
+  { text: "看到敌军时（红色虚线是它要去的方向），点它，选<b>「半路截杀」</b>就能从你的城派兵迎击。<br><b>外交</b>可以结盟、宣战、求和；<b>战报</b>记录所有动静。", target: ".btns", wait: null },
+  { text: "怎么赢：占全图<b>六成</b>领地并守住 60 秒；或者熬到 25 分钟结束时国力第一。最后 3 分钟全图公开。<br>去吧，一统苍澜！", target: null, wait: null }
+];
+function tutStart(manual) {
+  if (!G) return; tutEnd();
+  TUT.on = true; TUT.i = 0; TUT.manual = !!manual;
+  TUT.spot = el(`<div class="tut-spot" hidden></div>`); TUT.card = el(`<div class="tut"><div class="tut-n"></div><div class="tut-t"></div><div class="tut-b"><button class="btn sm ghost" id="tutSkip">跳过教程</button><span class="tut-wait">👆 等你操作…</span><button class="btn sm" id="tutNext">下一步</button></div></div>`);
+  document.body.append(TUT.spot, TUT.card);
+  TUT.card.querySelector("#tutSkip").onclick = () => tutEnd(true);
+  TUT.card.querySelector("#tutNext").onclick = () => tutNext();
+  closeSheets(); setMode(null);
+  const c = G.sim.P[G.me].capital; G.rd.focus(c); G.rd.cam.z = G.rd.fitZ() * 2.4; G.rd.clamp();
+  tutShow();
+}
+function tutShow() {
+  const S = TUT_STEPS[TUT.i]; if (!S) return tutEnd(true);
+  TUT.card.querySelector(".tut-n").textContent = `新手教程 ${TUT.i + 1} / ${TUT_STEPS.length}`;
+  TUT.card.querySelector(".tut-t").innerHTML = S.text;
+  TUT.card.querySelector(".tut-wait").hidden = !S.wait; TUT.card.querySelector("#tutNext").hidden = !!S.wait;
+  TUT.card.querySelector("#tutNext").textContent = TUT.i === TUT_STEPS.length - 1 ? "开始征战" : "下一步";
+  TUT.card.classList.remove("pop"); void TUT.card.offsetWidth; TUT.card.classList.add("pop");
+}
+function tutNext() { TUT.i++; if (TUT.i >= TUT_STEPS.length) return tutEnd(true); tutShow(); }
+// 玩家做了某个操作：教程若正等这一步，就往下走
+function tutHit(what, arg) {
+  if (!TUT.on) return; const S = TUT_STEPS[TUT.i]; if (!S || S.wait !== what) return;
+  if (what === "region" && (arg == null || G.sim.R[arg].owner !== G.me)) return;
+  setTimeout(tutNext, what === "send:move" ? 600 : 250);
+}
+// 每帧：把聚光灯对准目标（界面元素按它的位置；国都按地图坐标）
+function tutTick() {
+  const S = TUT_STEPS[TUT.i], sp = TUT.spot; if (!S) return;
+  let r = null;
+  if (S.target === "capital") { const g = G.sim.map.regions[G.sim.P[G.me].capital], p = G.rd.toScreen(g.x, g.y); r = { left: p.x - 52, top: p.y - 60, width: 104, height: 104, round: 1 }; }
+  else if (S.target) { const e = document.querySelector(S.target); if (e && e.offsetParent !== null) { const b = e.getBoundingClientRect(); r = { left: b.left - 6, top: b.top - 6, width: b.width + 12, height: b.height + 12 }; } }
+  sp.hidden = !r;
+  if (r) { sp.style.left = r.left + "px"; sp.style.top = r.top + "px"; sp.style.width = r.width + "px"; sp.style.height = r.height + "px"; sp.style.borderRadius = r.round ? "50%" : "8px"; }
+  // 卡片放在目标的另一侧，免得挡住
+  const low = r ? r.top + r.height / 2 > innerHeight * .55 : false;
+  TUT.card.classList.toggle("top", low);
+}
+function tutEnd(done) {
+  if (TUT.spot) TUT.spot.remove(); if (TUT.card) TUT.card.remove(); TUT.spot = TUT.card = null;
+  if (TUT.on && done) { try { localStorage.setItem("lz.tutDone", "1"); } catch {} if (TUT.i >= TUT_STEPS.length - 1 && G) toast("教程结束，祝你一统苍澜！", "good"); }
+  TUT.on = false;
 }
 
 /* ---------- 结束 ---------- */
