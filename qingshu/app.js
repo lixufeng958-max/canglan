@@ -60,7 +60,8 @@ function enterRoom(net, code) {
 }
 function renderRoom(net, room) {
   const host = room.host === net.user.uid;
-  $("#rCount").textContent = `${room.players.length} / 4`;
+  $("#rCount").textContent = `${room.players.length} / 6`;
+  $("#rDeck").textContent = room.players.length >= 5 ? "21 张扩展牌（多了间谍、大臣）" : "16 张经典牌";
   const pl = $("#rPlayers"); pl.innerHTML = "";
   room.players.forEach(p => {
     const row = el(`<div class="pl"><i style="background:${p.color}"></i><span></span><small>${p.bot ? "电脑" : p.id === room.host ? "房主" : ""}</small>${host && p.bot ? '<button>移除</button>' : ""}</div>`);
@@ -68,10 +69,10 @@ function renderRoom(net, room) {
     const rm = row.querySelector("button"); if (rm) rm.onclick = () => net.updateRoom(room.code, r => { r.players = r.players.filter(x => x.id !== p.id); });
     pl.append(row);
   });
-  $("#rNeed").textContent = TOKENS[Math.max(2, room.players.length)] || 4;
+  $("#rNeed").textContent = TOKENS[Math.max(2, room.players.length)] || 3;
   $("#rHost").hidden = !host; $("#rWait").hidden = host;
-  $("#rBot").disabled = room.players.length >= 4;
-  $("#rBot").onclick = () => net.updateRoom(room.code, r => { if (r.players.length >= 4) return; const used = r.players.map(p => p.color), names = r.players.map(p => p.name); r.players.push({ id: "bot" + Date.now().toString(36), name: QSNet.BOT_NAMES.find(n => !names.includes(n)) || "电脑", color: QS.COLORS.find(c => !used.includes(c)), bot: true }); });
+  $("#rBot").disabled = room.players.length >= 6;
+  $("#rBot").onclick = () => net.updateRoom(room.code, r => { if (r.players.length >= 6) return; const used = r.players.map(p => p.color), names = r.players.map(p => p.name); r.players.push({ id: "bot" + Date.now().toString(36), name: QSNet.BOT_NAMES.find(n => !names.includes(n)) || "电脑", color: QS.COLORS.find(c => !used.includes(c)), bot: true }); });
   $("#rStart").onclick = async () => { if (room.players.length < 2) return $("#rErr").textContent = "至少要 2 名玩家（可以加电脑）"; $("#rStart").disabled = true; try { await net.startRoom(room.code); } catch (e) { $("#rErr").textContent = e.message; } finally { $("#rStart").disabled = false; } };
   $("#rLeave").onclick = async () => { if (!host) await net.updateRoom(room.code, r => { r.players = r.players.filter(x => x.id !== net.user.uid); }).catch(() => {}); roomUnsub && roomUnsub(); roomUnsub = null; ONLINE ? openHome() : openAuth(); };
 }
@@ -116,7 +117,7 @@ function tickBots() {
   const p = s.cur(); if (!s.P[p].bot) return;
   if (!G.botAt) { G.botAt = now + 1400 + Math.random() * 1200; return; }
   if (now < G.botAt) return; G.botAt = 0;
-  const a = botDecide(s, p, s.n); if (a) G.net.sendEvent(G.code, { by: p, type: "play", a }).catch(() => {});
+  const ev = botDecide(s, p, s.n); if (ev) G.net.sendEvent(G.code, { by: p, type: ev.type, a: ev.a }).catch(() => {});
 }
 function pumpLog() {
   const s = G.sim;
@@ -128,16 +129,16 @@ function pumpLog() {
 }
 
 /* ---------- 画面 ---------- */
-const cardHTML = (v, cls = "") => { const C = CARDS[v]; return `<div class="card c${v} ${cls}"><span class="num">${v}</span><div class="art">${QSArt[v]}</div><b>${C.name}</b><small>${C.n} 张</small></div>`; };
+const cardHTML = (v, cls = "") => { const C = CARDS[v]; return `<div class="card c${v} ${cls}"><span class="num">${v}</span><div class="art">${QSArt[v]}</div><b>${C.name}</b><small>${G && G.sim ? G.sim.countOf(v) : (C.n || C.nx)} 张</small></div>`; };
 const backHTML = (cls = "") => `<div class="card back ${cls}"><div class="seal">情<br>书</div></div>`;
 function render() {
   if (!G) return;
-  const s = G.sim, me = G.me, S = s.S, mine = S[me], myTurn = s.phase === "play" && s.cur() === me;
+  const s = G.sim, me = G.me, S = s.S, mine = S[me], myTurn = s.phase === "play" && s.cur() === me, keeping = s.phase === "chancellor" && s.cur() === me;
   // 对手一排
   const ops = $("#opps"); ops.innerHTML = "";
   for (const p of s.order) {
     if (p === me) continue;
-    const t = S[p], P = s.P[p], cur = s.phase === "play" && s.cur() === p;
+    const t = S[p], P = s.P[p], cur = (s.phase === "play" || s.phase === "chancellor") && s.cur() === p;
     const last = t.disc.length ? t.disc[t.disc.length - 1] : null;
     const known = mine.know[p] != null && !t.out ? mine.know[p] : null;
     const d = el(`<div class="opp ${t.out ? "out" : ""} ${cur ? "cur" : ""} ${t.safe ? "safe" : ""}" data-p="${p}">
@@ -160,6 +161,7 @@ function render() {
   const h = $("#hand"); h.innerHTML = "";
   const must = s.mustPlay(mine.hand);
   if (mine.out) h.append(el(`<div class="note">你这一轮已经出局，看别人打完吧。</div>`));
+  else if (keeping) mine.hand.forEach(v => { const c = el(cardHTML(v, "playable")); c.onclick = () => { send("keep", { card: v }); toast(`留下「${CARDS[v].name}」，其余放回牌库底`, "good"); }; h.append(c); });
   else mine.hand.forEach((v, i) => {
     const c = el(cardHTML(v, (myTurn ? "playable" : "") + (must && v !== must ? " locked" : "") + (G.pick && G.pick.card === v && G.pick.i === i ? " picked" : "")));
     c.onclick = () => { if (!myTurn) return toast("还没轮到你"); if (must && v !== must) return toast("手里有太子或帝君时，必须打出皇后", "bad"); openPlay(v, i); };
@@ -168,9 +170,12 @@ function render() {
   const st = $("#status");
   if (s.phase === "roundEnd" || s.over) st.textContent = s.winner ? `${s.P[s.winner].name}赢得这一轮` + (s.over ? "" : "，下一轮马上开始…") : "";
   else if (mine.out) st.textContent = `等待这一轮结束…`;
+  else if (keeping) st.textContent = "大臣：点一张要留下的牌，其余两张放回牌库底";
+  else if (s.phase === "chancellor") st.textContent = `${s.P[s.cur()].name}正在挑牌…`;
   else if (myTurn) st.textContent = must ? "你必须打出皇后" : "轮到你了：点一张牌打出";
   else st.textContent = `等待${s.P[s.cur()].name}出牌…`;
-  $("#hand").classList.toggle("myturn", myTurn && !mine.out);
+  $("#hand").classList.toggle("myturn", (myTurn || keeping) && !mine.out);
+  $("#deckMode").textContent = s.ext ? "扩展 21 张" : "经典 16 张";
   // 轮次结算
   if (s.phase === "roundEnd" && !s.over && G.shownRound !== s.round) { G.shownRound = s.round; showRound(); }
 }
@@ -193,10 +198,11 @@ function openPlay(card, i) {
   }
   if (C.guess && ts.length) {
     const gs = body.querySelector("#gs");
-    gs.innerHTML = `<div class="lbl">猜他的手牌是</div><div class="opts guess">${[2, 3, 4, 5, 6, 7, 8].map(v => `<button class="opt c${v}" data-g="${v}"><span class="num">${v}</span>${CARDS[v].name}</button>`).join("")}</div>`;
+    gs.innerHTML = `<div class="lbl">猜他的手牌是</div><div class="opts guess">${s.guessable().map(v => `<button class="opt c${v}" data-g="${v}"><span class="num">${v}</span>${CARDS[v].name}</button>`).join("")}</div>`;
     gs.querySelectorAll(".opt").forEach(b => b.onclick = () => { guess = +b.dataset.g; gs.querySelectorAll(".opt").forEach(x => x.classList.toggle("on", x === b)); upd(); });
   }
-  if (card === 8) body.querySelector("#tg").innerHTML = `<p class="note warn">打出公主你就立刻出局！真的要打吗？</p>`;
+  if (card === 9) body.querySelector("#tg").innerHTML = `<p class="note warn">打出公主你就立刻出局！真的要打吗？</p>`;
+  if (card === 6) body.querySelector("#tg").innerHTML = `<p class="note">打出后会从牌库摸 2 张，你再从 3 张里挑 1 张留下。</p>`;
   upd();
   go.onclick = () => { send("play", { card, target, guess }); sh.close(); tutHit("send"); };
 }
@@ -257,7 +263,9 @@ $("#bLog").onclick = () => {
 function openCards() {
   const s = G && G.sim, seen = {};
   if (s) { for (const q of s.order) for (const v of s.S[q].disc) seen[v] = (seen[v] || 0) + 1; for (const v of s.faceUp) seen[v] = (seen[v] || 0) + 1; }
-  const body = el(`<div class="gallery">${[1, 2, 3, 4, 5, 6, 7, 8].map(v => `<div class="gitem">${cardHTML(v)}<div><b class="c${v}">${v} · ${CARDS[v].name}</b><p>${esc(CARDS[v].desc)}</p><small>一共 ${CARDS[v].n} 张${s ? `，已经打出 ${seen[v] || 0} 张` : ""}</small></div></div>`).join("")}
+  const vals = s ? s.values : Object.keys(CARDS).map(Number), nP = s ? s.nP : 4;
+  const body = el(`<div class="gallery"><p class="note">${s ? (s.ext ? "这局是 5–6 人的扩展牌组：21 张、10 种角色" : "这局是 4 人以下的经典牌组：16 张、8 种角色") : "4 人及以下用 16 张经典牌（8 种角色）；5–6 人用 21 张扩展牌，多了间谍和大臣。"}</p>
+    ${vals.map(v => `<div class="gitem${s ? "" : (CARDS[v].n ? "" : " ext")}">${cardHTML(v)}<div><b class="c${v}">${v} · ${CARDS[v].name}</b>${!s && !CARDS[v].n ? '<span class="xtag">扩展牌组</span>' : ""}<p>${esc(CARDS[v].desc)}</p><small>${s ? `一共 ${s.countOf(v)} 张，已经打出 ${seen[v] || 0} 张` : `经典 ${CARDS[v].n} 张 · 扩展 ${CARDS[v].nx} 张`}</small></div></div>`).join("")}
     <p class="note">数字越大越尊贵：牌库摸空时，手里数字大的赢。${s ? "「已经打出」把别人弃掉的牌都算上了，用来推测剩下什么。" : ""}</p></div>`);
   sheet("八种角色", body);
 }
@@ -268,13 +276,13 @@ async function startTutorial() { TUT.pending = true; const c = await LOCAL.creat
 /* ---------- 新手教程：在真实牌局里一步步教 ---------- */
 const TUT = { on: false, i: 0, pending: false };
 const TUT_STEPS = [
-  { text: "欢迎！一共 16 张牌、8 种角色，<b>每人手里只有 1 张</b>。轮到你时先摸 1 张（变成 2 张），再打出 1 张。<br>下面这两张就是你的手牌。", target: "#hand" },
+  { text: "欢迎！4 人以下用 16 张牌、8 种角色（5–6 人是 21 张），<b>每人手里只有 1 张</b>。轮到你时先摸 1 张（变成 2 张），再打出 1 张。<br>下面这两张就是你的手牌。", target: "#hand" },
   { text: "上面是对手：左边扣着的是他的手牌，右边是他<b>最近弃掉的牌</b>。记住别人弃过什么，剩下的就好猜。", target: "#opps" },
-  { text: "牌库每轮 16 张，开局扣掉 1 张谁也不知道。两人局还会明放 3 张。牌库摸空时，还没出局的人比手牌，<b>数字大的赢</b>。", target: ".center" },
+  { text: "牌库开局会扣掉 1 张谁也不知道。两人局还会明放 3 张。牌库摸空时，还没出局的人比手牌，<b>数字大的赢</b>。", target: ".center" },
   { text: "每张牌左上角的数字就是它的大小，名字下面写着张数。想看所有角色的效果，随时点右上角的<b>「角色」</b>。<br>现在<b>点一张手牌</b>。", target: "#hand", wait: "open" },
   { text: "这里是这张牌的效果。需要目标的牌先选一名玩家；侍卫还要猜他拿的是什么。选好后点<b>「打出」</b>。", target: ".sheet", wait: "send" },
-  { text: "打出的牌进弃牌堆，效果马上生效。几条规矩：<b>侍女</b>保护你到下回合；手里有太子或帝君时<b>必须打皇后</b>；<b>公主</b>打出去你就出局。", target: null },
-  { text: "被淘汰就等这一轮结束。赢一轮得一颗 ❤，先集满的人获胜（两人 7 颗、三人 5 颗、四人 4 颗）。轮次结束会翻开所有人的牌。<br>去吧，把情书送到公主手里！", target: null }
+  { text: "打出的牌进弃牌堆，效果马上生效。几条规矩：<b>侍女</b>保护你到下回合；手里有太子或帝君时<b>必须打皇后</b>；<b>公主</b>打出去你就出局。5–6 人局还有<b>间谍</b>（轮末可能多得一颗 ❤）和<b>大臣</b>（摸两张挑一张）。", target: null },
+  { text: "被淘汰就等这一轮结束。赢一轮得一颗 ❤，先集满的人获胜（两人 7 颗、三人 5 颗、四人 4 颗、五六人 3 颗）。轮次结束会翻开所有人的牌。<br>去吧，把情书送到公主手里！", target: null }
 ];
 function tutStart() {
   if (!G) return; tutEnd();
@@ -304,9 +312,9 @@ function tutEnd(done) { clearInterval(TUT.timer); if (TUT.spot) TUT.spot.remove(
 
 function openHelp() {
   sheet("玩法说明", el(`<div class="help">
-    <p>你是王宫里的追求者，要把情书送到公主手里。一共 16 张牌，8 种角色，<b>每人手里只有 1 张牌</b>。</p>
-    <h4>怎么玩</h4><p>轮到你时先摸 1 张（手里 2 张），再打出 1 张，照着牌上的效果做。被淘汰就本轮出局。牌库摸完时，还没出局的人比手牌，<b>数字大的赢</b>；或者只剩一个人时他赢。赢一轮得一颗 ❤，两人局先集 7 颗、三人局 5 颗、四人局 4 颗的人获胜。</p>
-    <h4>八种牌</h4>${[1, 2, 3, 4, 5, 6, 7, 8].map(v => `<div class="hrow"><span class="hn c${v}">${v}</span><b>${CARDS[v].name}</b><span>×${CARDS[v].n}</span><p>${esc(CARDS[v].desc)}</p></div>`).join("")}
+    <p>你是王宫里的追求者，要把情书送到公主手里。<b>每人手里只有 1 张牌</b>。4 人及以下用 16 张经典牌（8 种角色）；5–6 人自动换成 21 张扩展牌（多了间谍和大臣，侍卫 6 张）。</p>
+    <h4>怎么玩</h4><p>轮到你时先摸 1 张（手里 2 张），再打出 1 张，照着牌上的效果做。被淘汰就本轮出局。牌库摸完时，还没出局的人比手牌，<b>数字大的赢</b>；或者只剩一个人时他赢。赢一轮得一颗 ❤，两人局先集 7 颗、三人局 5 颗、四人局 4 颗、五六人局 3 颗的人获胜。</p>
+    <h4>十种牌</h4>${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(v => `<div class="hrow"><span class="hn c${v}">${v}</span><b>${CARDS[v].name}</b><span>×${CARDS[v].n}${CARDS[v].nx !== CARDS[v].n ? "/" + CARDS[v].nx : ""}</span><p>${esc(CARDS[v].desc)}</p></div>`).join("")}
     <h4>小窍门</h4><p>记住别人弃过什么牌，剩下的牌就好猜了。侍女保护期间别人碰不了你。手里有太子或帝君时必须先打皇后，这常常会暴露你。公主永远别打出去。</p>
     <h4>联机</h4><p>登录后创建房间，把 4 位房间号发给朋友，他们在首页输入就能加入。和苍澜·乱战用同一个账号。</p>
   </div>`));

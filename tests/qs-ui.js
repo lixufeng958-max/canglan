@@ -13,22 +13,24 @@ const shots = path.join(__dirname, "shots"); fs.mkdirSync(shots, { recursive: tr
   await page.goto(URL); await page.evaluate(() => { try { localStorage.clear(); } catch {} }); await page.goto(URL);
   await page.waitForFunction(() => { const s = document.querySelector("#sAuth"), h = document.querySelector("#sHome"); return (s && !s.hidden) || (h && !h.hidden); }, null, { timeout: 30000 });
   await page.locator("#aSolo").tap(); await page.waitForSelector("#sRoom:not([hidden])");
-  await page.locator("#rBot").tap(); await page.waitForTimeout(150); await page.locator("#rBot").tap(); await page.waitForTimeout(150);
+  for (let k = 0; k < 4; k++) { await page.locator("#rBot").tap(); await page.waitForTimeout(150); }
+  if (!/21/.test(await page.locator("#rDeck").textContent())) { console.log("5 人没有切到 21 张"); process.exit(1); }
   await page.screenshot({ path: path.join(shots, "qs-room.png") });
   await page.locator("#rStart").tap(); await page.waitForSelector("#sGame:not([hidden])");
   await page.waitForTimeout(800); await page.screenshot({ path: path.join(shots, "qs-game.png") });
-  let fails = 0, myPlays = 0, shot = false;
+  let fails = 0, myPlays = 0, shot = false, keeps = 0;
   // 新手教程：第一次进会自动出现，前 3 步点下一步，第 4、5 步靠下面出牌推进，最后再点完
   await page.waitForTimeout(1200);
   if (!(await page.evaluate(() => TUT.on))) { console.log("教程没有自动出现"); fails++; }
   else { for (let k = 0; k < 3; k++) { await page.locator("#tutNext").tap(); await page.waitForTimeout(200); } await page.screenshot({ path: path.join(shots, "qs-tut.png") }); }
   await page.locator("#bCards").tap(); await page.waitForTimeout(400); await page.screenshot({ path: path.join(shots, "qs-cards.png") });
-  if ((await page.locator(".gitem").count()) !== 8) { console.log("角色一览不是 8 张"); fails++; } await page.locator(".sh-head .x").tap(); await page.waitForTimeout(200);
+  if ((await page.locator(".gitem").count()) !== 10) { console.log("扩展局角色一览不是 10 张"); fails++; } await page.locator(".sh-head .x").tap(); await page.waitForTimeout(200);
   // 打到结束：轮到我就点第一张能打的牌，选第一个目标/猜测，打出
   for (let i = 0; i < 1200; i++) {
-    const st = await page.evaluate(() => G ? { over: !!G.sim.over, my: G.sim.phase === "play" && G.sim.cur() === G.me && !G.sim.S[G.me].out, round: G.sim.round } : null);
+    const st = await page.evaluate(() => G ? { over: !!G.sim.over, my: G.sim.phase === "play" && G.sim.cur() === G.me && !G.sim.S[G.me].out, keep: G.sim.phase === "chancellor" && G.sim.cur() === G.me, round: G.sim.round } : null);
     if (!st) { fails++; console.log("牌局对象没了"); break; }
     if (st.over) break;
+    if (st.keep) { await page.screenshot({ path: path.join(shots, "qs-chancellor.png") }); await page.locator("#hand .card.playable").last().tap(); keeps++; await page.waitForTimeout(400); continue; }
     if (st.my) {
       const cards = page.locator("#hand .card.playable:not(.locked)");
       if (!(await cards.count())) { await page.waitForTimeout(300); continue; }
@@ -48,7 +50,7 @@ const shots = path.join(__dirname, "shots"); fs.mkdirSync(shots, { recursive: tr
   const again = page.locator("#eAgain");
   if (!(await again.count())) { console.log("结束后没有再来一局按钮"); fails++; }
   else { await again.tap(); await page.waitForSelector("#sRoom:not([hidden])", { timeout: 8000 }).catch(() => { console.log("再来一局没回到房间"); fails++; }); }
-  console.log(`我出了 ${myPlays} 手牌，${over ? "一局打完" : "没打完"}`);
+  console.log(`我出了 ${myPlays} 手牌，大臣挑牌 ${keeps} 次，${over ? "一局打完" : "没打完"}`);
   await br.close();
   if (errors.length) { console.log("页面报错：\n" + [...new Set(errors)].slice(0, 8).join("\n")); fails++; }
   console.log(fails ? `失败 ${fails} 项` : "情书界面测试通过"); process.exit(fails ? 1 : 0);

@@ -17,7 +17,7 @@
 <style>
 /* 宫廷夜色：绛紫底、金线、八种牌各有一色 */
 :root{--bg:#1C1218;--panel:#2A1A22;--panel-2:#3A2630;--card:#33202A;--text:#F2E6D8;--soft:#D4C2B0;--muted:#9E8A8E;--line:#5A3E48;--gold:#D9A93A;--red:#C9323F;--good:#6BBF6E;--bad:#FF6A6A;
-  --c1:#8FA3B5;--c2:#7FB0A0;--c3:#C9A24A;--c4:#D98FB0;--c5:#5FB8E8;--c6:#E0B13F;--c7:#B48CFF;--c8:#FF6B8A;
+  --c0:#9A9A9A;--c1:#8FA3B5;--c2:#7FB0A0;--c3:#C9A24A;--c4:#D98FB0;--c5:#5FB8E8;--c6:#6FCFA0;--c7:#E0B13F;--c8:#B48CFF;--c9:#FF6B8A;
   --display:"Noto Serif SC","Songti SC","STSong",serif;--body:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;
   --st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px);--gl:max(14px,env(safe-area-inset-left,0px));--gr:max(14px,env(safe-area-inset-right,0px));
   --grain:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .95  0 0 0 0 .8  0 0 0 0 .7  0 0 0 .06 0'/></filter><rect width='160' height='160' filter='url(%23n)'/></svg>");color-scheme:dark}
@@ -67,7 +67,8 @@ input{font:inherit;font-size:16px;color:var(--text);background:var(--card);borde
 .card .art svg{width:100%;height:100%}
 .card b{font-family:var(--display);font-weight:900;font-size:17px;margin-top:4px;letter-spacing:.1em}
 .card small{font-size:10px;color:var(--muted);margin-top:auto;margin-bottom:8px}
-.c1{--cc:var(--c1)}.c2{--cc:var(--c2)}.c3{--cc:var(--c3)}.c4{--cc:var(--c4)}.c5{--cc:var(--c5)}.c6{--cc:var(--c6)}.c7{--cc:var(--c7)}.c8{--cc:var(--c8)}
+.c0{--cc:var(--c0)}.c1{--cc:var(--c1)}.c2{--cc:var(--c2)}.c3{--cc:var(--c3)}.c4{--cc:var(--c4)}.c5{--cc:var(--c5)}.c6{--cc:var(--c6)}.c7{--cc:var(--c7)}.c8{--cc:var(--c8)}.c9{--cc:var(--c9)}
+.xtag{font-size:10px;background:var(--c6);color:#1C1218;padding:1px 6px;border-radius:3px;margin-left:6px;font-weight:700;vertical-align:middle}
 .card.mini{width:54px;height:78px;border-radius:6px;box-shadow:inset 0 0 0 2px #2A1A22,inset 0 0 0 3px color-mix(in srgb,var(--cc) 60%,transparent),0 3px 8px rgba(0,0,0,.4)}
 .card.mini .num{left:5px;top:3px;font-size:13px}.card.mini .art{width:28px;height:28px;margin-top:14px}.card.mini b{font-size:11px;margin-top:2px;letter-spacing:0}.card.mini small{display:none}
 .card.back{--cc:var(--gold);background:var(--grain),repeating-linear-gradient(45deg,#3A2430 0 6px,#2E1C26 6px 12px);justify-content:center}
@@ -84,7 +85,7 @@ input{font:inherit;font-size:16px;color:var(--text);background:var(--card);borde
 /* ---------- 牌局 ---------- */
 #sGame{background:var(--grain),radial-gradient(120% 60% at 50% 100%,#4A2A3A 0%,var(--bg) 70%)}
 .hud{display:flex;align-items:center;gap:8px;padding:calc(var(--st) + 8px) var(--gr) 8px var(--gl);border-bottom:1px solid var(--line);background:rgba(26,16,22,.8)}
-.hud b{font-family:var(--display);font-weight:900;font-size:17px;flex:1}
+.hud b{font-family:var(--display);font-weight:900;font-size:17px}.hud small{flex:1}
 .ibtn{border:1px solid var(--line);background:var(--card);border-radius:3px;height:38px;min-width:44px;padding:0 10px;font-family:var(--display);font-weight:700;font-size:14px}
 .table{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:10px var(--gr) 10px var(--gl)}
 .opps{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px}
@@ -229,7 +230,7 @@ input{font:inherit;font-size:16px;color:var(--text);background:var(--card);borde
     <button class="btn ghost sm" id="rCopy" style="align-self:center">复制房间号</button>
     <div class="h">玩家 <span class="tip" id="rCount"></span></div>
     <div class="plist" id="rPlayers"></div>
-    <div class="cardbox tip">先集满 <b id="rNeed">4</b> 颗 ❤ 的人获胜（两人 7 颗、三人 5 颗、四人 4 颗）。每轮几分钟。</div>
+    <div class="cardbox tip">牌组：<b id="rDeck">16 张经典牌</b>（4 人及以下 16 张；5–6 人自动换 21 张扩展牌）。先集满 <b id="rNeed">4</b> 颗 ❤ 的人获胜（两人 7、三人 5、四人 4、五六人 3）。</div>
     <div id="rHost">
       <button class="btn ghost block" id="rBot">＋ 加一个电脑玩家</button>
       <p class="err" id="rErr"></p>
@@ -241,7 +242,7 @@ input{font:inherit;font-size:16px;color:var(--text);background:var(--card);borde
 </section>
 
 <section class="screen" id="sGame" hidden>
-  <div class="hud"><b id="round">第 1 轮</b><button class="ibtn" id="bCards">角色</button><button class="ibtn" id="bLog">战报</button><button class="ibtn" id="bMenu">☰</button></div>
+  <div class="hud"><b id="round">第 1 轮</b><small id="deckMode" style="color:var(--muted);font-size:12px;margin-right:4px"></small><button class="ibtn" id="bCards">角色</button><button class="ibtn" id="bLog">战报</button><button class="ibtn" id="bMenu">☰</button></div>
   <div class="toasts" id="toasts"></div>
   <div class="table">
     <div class="opps" id="opps"></div>
