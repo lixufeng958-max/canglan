@@ -110,34 +110,46 @@ input{font:inherit;font-size:16px;color:var(--text);background:var(--card);borde
 .hud{display:flex;align-items:center;gap:8px;padding:calc(var(--st) + 8px) var(--gr) 8px var(--gl);border-bottom:1px solid var(--line);background:rgba(26,16,22,.8)}
 .hud b{font-family:var(--display);font-weight:900;font-size:17px}.hud small{flex:1}
 .ibtn{border:1px solid var(--line);background:var(--card);border-radius:3px;height:38px;min-width:44px;padding:0 10px;font-family:var(--display);font-weight:700;font-size:14px}
-.table{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding:10px var(--gr) 10px var(--gl)}
-.opps{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px}
-.opps::-webkit-scrollbar{display:none}
-.opp{position:relative;flex:1 0 150px;max-width:220px;background:var(--panel);border:1.5px solid var(--line);border-radius:8px;padding:8px;display:grid;grid-template-columns:auto 1fr;gap:6px 8px;align-items:center}
-.opp .who{grid-column:1/-1;display:flex;align-items:center;gap:6px;font-size:13px}
-.opp .who i{width:12px;height:12px;border-radius:50%;flex:none}
-.opp .who b{font-family:var(--display);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.hearts{color:var(--red);font-size:12px;letter-spacing:1px}.hearts .dim{color:var(--line)}
-.opp .disc{display:flex;gap:6px;align-items:center}
-.opp .disc small{font-size:10px;color:var(--muted);line-height:1.3}
-.opp.cur{border-color:var(--gold);box-shadow:0 0 18px rgba(217,169,58,.35)}
-.opp.out{opacity:.55}.opp.safe{border-color:var(--c4)}
-.badge{position:absolute;right:6px;top:6px;font-size:10px;background:var(--c4);color:#2A1A22;padding:1px 6px;border-radius:3px;font-weight:700}
-.badge.turn{background:var(--gold);animation:blink 1.2s ease-in-out infinite}
-@keyframes blink{50%{opacity:.5}}
-.center{display:flex;align-items:center;gap:14px;justify-content:center;padding:6px 0}
-.deck{position:relative}
-.deck .n{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--display);font-weight:900;font-size:22px;color:var(--gold);text-shadow:0 1px 4px #000}
-.center .lbl{font-size:12px;color:var(--muted);text-align:center}.center .lbl b{color:var(--gold)}
-.recent{list-style:none;margin:0;padding:0 4px;display:flex;flex-direction:column;gap:3px}
-.recent li{font-size:13px;color:var(--soft);font-family:var(--display);padding:4px 8px;border-left:3px solid var(--line);background:rgba(0,0,0,.2);border-radius:0 4px 4px 0}
+.table{flex:1;position:relative;overflow:hidden;min-height:0}
+.table::before{content:"";position:absolute;left:50%;top:50%;width:96%;height:94%;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle at 50% 40%,#4A2A3A,#2E1C26 70%,transparent 72%);box-shadow:inset 0 0 0 2px rgba(217,169,58,.25),inset 0 0 40px rgba(0,0,0,.5)}
+.seat{position:absolute;transform:translate(-50%,-50%);width:78px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;transition:left .3s,top .3s}
+.seat .av{position:relative;width:32px;height:32px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-family:var(--display);font-weight:900;font-size:16px;color:#1C1218;box-shadow:0 2px 8px rgba(0,0,0,.5)}
+.seat .nm{font-size:11px;font-family:var(--display);font-weight:600;max-width:78px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
+.seat .hearts{font-size:10px;line-height:1}
+.seat .cards{display:flex;gap:4px;align-items:flex-end}
+.seat .cards .card.mini{width:36px;height:52px}
+.seat .cards .card.mini .art{width:18px;height:18px;margin-top:11px}.seat .cards .card.mini b{font-size:8.5px}.seat .cards .card.mini .num{width:12px;height:12px;font-size:8px;left:3px;top:3px}.seat .cards .card.mini .fr{inset:2px}
+.seat .cards .card.mini.back .seal{width:16px;height:24px;font-size:8px;line-height:1.2}
+.seat .cnt{position:absolute;right:-4px;bottom:-4px;min-width:16px;height:16px;border-radius:8px;background:var(--gold);color:#1C1218;font-size:10px;font-weight:700;display:grid;place-items:center;padding:0 3px}
+.seat .dpile{position:relative}
+.seat.cur .av{border-color:var(--gold);box-shadow:0 0 0 3px rgba(217,169,58,.3),0 0 18px rgba(217,169,58,.6);animation:blink 1.2s ease-in-out infinite}
+.seat.out{opacity:.5}.seat.out .av{filter:grayscale(1)}
+.seat.safe .av{border-color:var(--c4);box-shadow:0 0 0 3px rgba(217,143,176,.35)}
+.seat .badge{font-size:9px;background:var(--c4);color:#1C1218;padding:0 5px;border-radius:3px;font-weight:700}
+.seat .badge.turn{background:var(--gold)}
+.seat .badge.outb{background:var(--bad);color:#fff}
+@keyframes blink{50%{box-shadow:0 0 0 3px rgba(217,169,58,.15),0 0 6px rgba(217,169,58,.3)}}
+.center{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);width:min(62%,300px);display:flex;flex-direction:column;align-items:center;gap:6px}
+.center .row2{display:flex;align-items:flex-start;gap:8px;justify-content:center;width:100%}
+.deck{position:relative;flex:none;text-align:center}
+.center .lbl{font-size:11px;color:var(--muted);text-align:center;line-height:1.2}.center .lbl b{color:var(--gold)}
+.pile{flex:1;min-width:0}
+.pile .lbl{text-align:left;margin-bottom:3px}
+.pile .chips{display:flex;flex-wrap:wrap;gap:3px}
+.chip{--cc:var(--c1);display:inline-flex;align-items:center;gap:2px;border:1px solid color-mix(in srgb,var(--cc) 60%,transparent);background:color-mix(in srgb,var(--cc) 18%,#1C1218);border-radius:4px;padding:0 5px;font-size:10.5px;font-family:var(--display);color:var(--text)}
+.chip i{font-style:normal;font-weight:900;color:var(--cc);font-size:11px}
+.chip em{font-style:normal;color:var(--muted);font-size:10px}
+.chip.left{opacity:.35;border-style:dashed}
+.recent{list-style:none;margin:0;padding:0;width:100%;display:flex;flex-direction:column;gap:2px}
+.recent li{font-size:11.5px;color:var(--soft);font-family:var(--display);padding:2px 8px;border-left:3px solid var(--line);background:rgba(0,0,0,.25);border-radius:0 4px 4px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .recent li.out{border-left-color:var(--bad)}.recent li.phase{border-left-color:var(--gold)}.recent li.secret{border-left-color:var(--c3);color:var(--c3)}
-.faceup{display:flex;gap:4px}
+.faceup{display:flex;gap:4px;justify-content:center}
+.dlist{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
 .me{border-top:1px solid var(--line);background:rgba(26,16,22,.85);padding:8px var(--gr) calc(var(--sb) + 10px) var(--gl)}
 .me .who{display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:4px}
 .me .who i{width:12px;height:12px;border-radius:50%}
 .me .who b{font-family:var(--display)}
-.me .who .disc{margin-left:auto;font-size:11px;color:var(--muted)}
+.me .who .disc{margin-left:auto;font-size:11px;color:var(--muted);max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .me .who .disc span{font-weight:700}
 #status{font-family:var(--display);font-size:15px;text-align:center;padding:4px 0 8px;color:var(--soft)}
 .hand{display:flex;gap:14px;justify-content:center;min-height:150px;align-items:flex-end;padding-top:12px}
@@ -267,13 +279,16 @@ input{font:inherit;font-size:16px;color:var(--text);background:var(--card);borde
 <section class="screen" id="sGame" hidden>
   <div class="hud"><b id="round">第 1 轮</b><small id="deckMode" style="color:var(--muted);font-size:12px;margin-right:4px"></small><button class="ibtn" id="bCards">角色</button><button class="ibtn" id="bLog">战报</button><button class="ibtn" id="bMenu">☰</button></div>
   <div class="toasts" id="toasts"></div>
-  <div class="table">
-    <div class="opps" id="opps"></div>
+  <div class="table" id="table">
+    <div id="opps"></div>
     <div class="center">
-      <div><div class="deck"><div class="card mini back"><div class="seal">情<br>书</div></div></div><div class="lbl">牌库 <b id="deckN">0</b> 张</div></div>
+      <div class="row2">
+        <div class="deck"><div class="card mini back"><i class="fr"></i><div class="seal">情<br>书</div></div><div class="lbl">牌库 <b id="deckN">0</b> 张</div></div>
+        <div class="pile"><div class="lbl">场上弃牌（点人名看各自的）</div><div class="chips" id="pile"></div></div>
+      </div>
       <div id="faceUpBox" hidden><div class="faceup" id="faceUp"></div><div class="lbl">明牌（不在局中）</div></div>
+      <ul class="recent" id="recent"></ul>
     </div>
-    <ul class="recent" id="recent"></ul>
   </div>
   <div class="me">
     <div class="who"><i id="me-flag"></i><b id="me-name"></b><span class="hearts" id="me-hearts"></span><span class="disc" id="me-disc"></span></div>

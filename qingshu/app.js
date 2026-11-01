@@ -137,28 +137,39 @@ function render() {
   if (!G) return;
   const s = G.sim, me = G.me, S = s.S, mine = S[me], myTurn = s.phase === "play" && s.cur() === me, keeping = s.phase === "chancellor" && s.cur() === me;
   // 对手一排
+  // 围桌：对手固定围成一圈，不用滑动
   const ops = $("#opps"); ops.innerHTML = "";
-  for (const p of s.order) {
-    if (p === me) continue;
+  const others = s.order.filter(p => p !== me), n = others.length;
+  // 从左下 160° 经过顶部到右下 380°，均匀排在一个椭圆上
+  const spread = { 1: 0, 2: 110, 3: 160, 4: 200, 5: 220 }[n] || 220;
+  const SEATS = others.map((_, i) => { const a = (n === 1 ? 270 : 270 - spread / 2 + spread * i / (n - 1)) * Math.PI / 180; return [50 + 41 * Math.cos(a), 50 + 40 * Math.sin(a)]; });
+  others.forEach((p, i) => {
     const t = S[p], P = s.P[p], cur = (s.phase === "play" || s.phase === "chancellor") && s.cur() === p;
     const last = t.disc.length ? t.disc[t.disc.length - 1] : null;
     const known = mine.know[p] != null && !t.out ? mine.know[p] : null;
-    const d = el(`<div class="opp ${t.out ? "out" : ""} ${cur ? "cur" : ""} ${t.safe ? "safe" : ""}" data-p="${p}">
-      <div class="who"><i style="background:${P.color}"></i><b></b><span class="hearts">${"❤".repeat(P.tokens)}<span class="dim">${"♡".repeat(Math.max(0, s.need - P.tokens))}</span></span></div>
-      <div class="hand">${t.out ? `<div class="card mini gone">出局</div>` : known != null ? cardHTML(known, "mini known") : backHTML("mini")}</div>
-      <div class="disc">${last != null ? cardHTML(last, "mini") : `<div class="card mini empty">弃牌</div>`}<small>${t.disc.length ? "弃 " + t.disc.map(v => CARDS[v].name).join("、") : "还没出牌"}</small></div>
-      ${t.safe ? `<span class="badge">侍女保护</span>` : ""}${cur ? `<span class="badge turn">思考中…</span>` : ""}</div>`);
-    d.querySelector("b").textContent = P.name;
+    const [x, y] = SEATS[i] || [50, 20];
+    const d = el(`<div class="seat ${t.out ? "out" : ""} ${cur ? "cur" : ""} ${t.safe ? "safe" : ""}" style="left:${x}%;top:${y}%" data-p="${p}">
+      <div class="av" style="background:${P.color}">${esc([...P.name][0])}</div>
+      <div class="nm"></div>
+      <span class="hearts">${"❤".repeat(P.tokens)}<span class="dim">${"♡".repeat(Math.max(0, s.need - P.tokens))}</span></span>
+      <div class="cards">${t.out ? `<div class="card mini gone">出局</div>` : known != null ? cardHTML(known, "mini known") : backHTML("mini")}<div class="dpile">${last != null ? cardHTML(last, "mini") : `<div class="card mini empty">弃</div>`}${t.disc.length > 1 ? `<span class="cnt">${t.disc.length}</span>` : ""}</div></div>
+      ${t.out ? `<span class="badge outb">出局</span>` : t.safe ? `<span class="badge">侍女保护</span>` : cur ? `<span class="badge turn">思考中…</span>` : ""}</div>`);
+    d.querySelector(".nm").textContent = P.name;
+    d.onclick = () => openPlayer(p);
     ops.append(d);
-  }
+  });
+  // 场上弃牌汇总：每种牌打出几张 / 还剩几张
+  const played = {}; for (const q of s.order) for (const v of S[q].disc) played[v] = (played[v] || 0) + 1; for (const v of s.faceUp) played[v] = (played[v] || 0) + 1;
+  $("#pile").innerHTML = s.values.map(v => { const k = played[v] || 0; return `<span class="chip c${v} ${k ? "" : "left"}"><i>${v}</i>${CARDS[v].name}<em>${k}/${s.countOf(v)}</em></span>`; }).join("");
   // 桌面
   $("#deckN").textContent = s.deck.length; $("#round").textContent = `第 ${s.round} 轮`;
   $("#faceUp").innerHTML = s.faceUp.map(v => cardHTML(v, "mini")).join("");
   $("#faceUpBox").hidden = !s.faceUp.length;
-  $("#recent").innerHTML = s.log.filter(l => (l.vis === "all" || l.vis.includes(me)) && l.kind !== "turn").slice(-5).map(l => `<li class="${l.kind}">${esc(l.text)}</li>`).join("");
+  $("#faceUpBox").hidden = !s.faceUp.length;
+  $("#recent").innerHTML = s.log.filter(l => (l.vis === "all" || l.vis.includes(me)) && l.kind !== "turn").slice(-3).map(l => `<li class="${l.kind}">${esc(l.text)}</li>`).join("");
   $("#me-hearts").innerHTML = "❤".repeat(s.P[me].tokens) + `<span class="dim">${"♡".repeat(Math.max(0, s.need - s.P[me].tokens))}</span>`;
   $("#me-name").textContent = s.P[me].name; $("#me-flag").style.background = s.P[me].color;
-  $("#me-disc").innerHTML = mine.disc.length ? "弃牌：" + mine.disc.map(v => `<span class="c${v}">${CARDS[v].name}</span>`).join("、") : "";
+  $("#me-disc").innerHTML = mine.disc.length ? "弃牌：" + mine.disc.map(v => `<span class="c${v}">${CARDS[v].name}</span>`).join("、") : ""; $("#me-disc").onclick = () => openPlayer(me);
   // 我的手牌
   const h = $("#hand"); h.innerHTML = "";
   const must = s.mustPlay(mine.hand);
@@ -180,6 +191,14 @@ function render() {
   $("#deckMode").textContent = s.ext ? "扩展 21 张" : "经典 16 张";
   // 轮次结算
   if (s.phase === "roundEnd" && !s.over && G.shownRound !== s.round) { G.shownRound = s.round; showRound(); }
+}
+/* 点某个玩家：看他这一轮弃过的全部牌 */
+function openPlayer(p) {
+  const s = G.sim, t = s.S[p], P = s.P[p];
+  const body = el(`<div><div class="tip" style="margin-bottom:8px"><span class="owner"><i style="background:${P.color};display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px"></i>${esc(P.name)}</span> · ❤ ${P.tokens}/${s.need}${t.out ? " · 本轮已出局" : t.safe ? " · 侍女保护中" : ""}${s.S[G.me].know[p] != null && !t.out && p !== G.me ? ` · 你知道他手里是「${CARDS[s.S[G.me].know[p]].name}」` : ""}</div>
+    <div class="lbl">本轮弃过的牌（按先后）</div>
+    <div class="dlist">${t.disc.length ? t.disc.map(v => cardHTML(v, "mini")).join("") : '<p class="note">还没出过牌</p>'}</div></div>`);
+  sheet(p === G.me ? "我的弃牌" : P.name, body);
 }
 /* 点了一张牌：需要目标就选人，侍卫再猜牌 */
 function openPlay(card, i) {
