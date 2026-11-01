@@ -1,6 +1,6 @@
 // 离线缓存：先用网络取最新版，断网时用缓存。改了文件就把版本号 +1
-const CACHE = "qingshu-v4";
-const FILES = ["./", "./index.html", "./app.js", "./sim.js", "./art.js", "./net.js", "./config.js", "./manifest.webmanifest", "./icon-180.png", "./icon-192.png", "./icon-512.png"];
+const CACHE = "qingshu-v5";
+const FILES = ["./", "./index.html", "./app.js", "./sim.js", "./art.js", "./net.js", "./audio.js", "./config.js", "./manifest.webmanifest", "./icon-180.png", "./icon-192.png", "./icon-512.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES))); self.skipWaiting(); });
 self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))); self.clients.claim(); });
 self.addEventListener("fetch", e => {

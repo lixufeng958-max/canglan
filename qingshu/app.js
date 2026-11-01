@@ -124,13 +124,15 @@ function pumpLog() {
   for (; G.seenLog < s.log.length; G.seenLog++) {
     const l = s.log[G.seenLog]; if (l.vis !== "all" && !l.vis.includes(G.me)) continue;
     if (l.kind === "turn") continue;
-    if (l.kind === "secret") toast(l.text, "secret"); else if (l.kind === "out" || l.kind === "phase") toast(l.text, l.kind === "out" ? "bad" : "good"); else if (l.kind !== "play") toast(l.text);
+    if (l.kind === "secret") { toast(l.text, "secret"); AU("play", "secret"); } else if (l.kind === "out" || l.kind === "phase") { toast(l.text, l.kind === "out" ? "bad" : "good"); AU("play", l.kind === "out" ? "out" : l.text.includes("❤") || l.text.includes("🕵") ? "heart" : "play"); } else if (l.kind === "play") AU("play", "play"); else toast(l.text);
   }
 }
 
 /* ---------- 画面 ---------- */
-const cardHTML = (v, cls = "") => { const C = CARDS[v]; return `<div class="card c${v} ${cls}"><span class="num">${v}</span><div class="art">${QSArt[v]}</div><b>${C.name}</b><small>${G && G.sim ? G.sim.countOf(v) : (C.n || C.nx)} 张</small></div>`; };
-const backHTML = (cls = "") => `<div class="card back ${cls}"><div class="seal">情<br>书</div></div>`;
+const cardHTML = (v, cls = "") => { const C = CARDS[v]; return `<div class="card c${v} ${cls}"><i class="fr"></i><span class="num">${v}</span><div class="art">${QSArt[v]}</div><div class="rib"><b>${C.name}</b></div><small>${G && G.sim ? G.sim.countOf(v) : (C.n || C.nx)} 张</small></div>`; };
+const backHTML = (cls = "") => `<div class="card back ${cls}"><i class="fr"></i><div class="seal">情<br>书</div></div>`;
+const AU = (fn, ...a) => { try { window.QSAudio && QSAudio[fn](...a); } catch {} };
+document.addEventListener("click", e => { if (e.target.closest && e.target.closest("button")) AU("play", "tap"); }, true);
 function render() {
   if (!G) return;
   const s = G.sim, me = G.me, S = s.S, mine = S[me], myTurn = s.phase === "play" && s.cur() === me, keeping = s.phase === "chancellor" && s.cur() === me;
@@ -214,7 +216,7 @@ function showRound() {
   const sh = sheet("本轮结束", body); setTimeout(() => sh.close(), 4200);
 }
 async function endGame() {
-  G.ended = true; const s = G.sim, win = s.over.w === G.me;
+  G.ended = true; const s = G.sim, win = s.over.w === G.me; AU("play", win ? "win" : "lose");
   const flag = "qs.done." + G.code + "." + (G.room.seed || 0); let done = false; try { done = !!localStorage.getItem(flag); localStorage.setItem(flag, 1); } catch {}
   if (!done) { try { const p = await G.net.profile(); await G.net.saveProfile({ games: (p.games || 0) + 1, wins: (p.wins || 0) + (win ? 1 : 0), room: null }); } catch {} if (G.host) G.net.endRoom(G.code, { w: s.over.w }).catch(() => {}); }
   const body = el(`<div><div class="rwin ${win ? "me" : ""}">${win ? "💌 公主收到了你的情书" : "💔 情书被" + esc(s.P[s.over.w].name) + "抢先送到了"}</div>
@@ -249,9 +251,10 @@ function sheet(title, body, onClose) {
   return { close, root: sc };
 }
 $("#bMenu").onclick = () => {
-  const body = el(`<div><button class="btn ghost block" id="mCards">八种角色</button><button class="btn ghost block" id="mTut">新手教程（在这局里边玩边学）</button><button class="btn ghost block" id="mHelp">玩法说明</button><button class="btn ghost block" id="mOut">离开（对局会继续，可以随时回来）</button></div>`);
+  const body = el(`<div><div class="seg" id="mSnd"><button data-k="music" aria-pressed="${QSAudio.music}">🎵 背景音乐 ${QSAudio.music ? "开" : "关"}</button><button data-k="sfx" aria-pressed="${QSAudio.sfx}">🔊 音效 ${QSAudio.sfx ? "开" : "关"}</button></div><p class="note">手机开着静音键时可能听不到声音。</p><button class="btn ghost block" id="mCards">角色一览</button><button class="btn ghost block" id="mTut">新手教程（在这局里边玩边学）</button><button class="btn ghost block" id="mHelp">玩法说明</button><button class="btn ghost block" id="mOut">离开（对局会继续，可以随时回来）</button></div>`);
   const sh = sheet("菜单", body);
   body.querySelector("#mCards").onclick = () => { sh.close(); openCards(); }; body.querySelector("#mTut").onclick = () => { sh.close(); tutStart(); };
+  body.querySelectorAll("#mSnd button").forEach(b => b.onclick = () => { const k = b.dataset.k, on = !QSAudio[k]; k === "music" ? QSAudio.setMusic(on) : QSAudio.setSfx(on); b.setAttribute("aria-pressed", on); b.textContent = (k === "music" ? "🎵 背景音乐 " : "🔊 音效 ") + (on ? "开" : "关"); });
   body.querySelector("#mHelp").onclick = () => { sh.close(); openHelp(); };
   body.querySelector("#mOut").onclick = () => { sh.close(); leaveGame(); };
 };
@@ -267,7 +270,7 @@ function openCards() {
   const body = el(`<div class="gallery"><p class="note">${s ? (s.ext ? "这局是 5–6 人的扩展牌组：21 张、10 种角色" : "这局是 4 人以下的经典牌组：16 张、8 种角色") : "4 人及以下用 16 张经典牌（8 种角色）；5–6 人用 21 张扩展牌，多了细作和国公。"}</p>
     ${vals.map(v => `<div class="gitem${s ? "" : (CARDS[v].n ? "" : " ext")}">${cardHTML(v)}<div><b class="c${v}">${v} · ${CARDS[v].name}</b>${!s && !CARDS[v].n ? '<span class="xtag">扩展牌组</span>' : ""}<p>${esc(CARDS[v].desc)}</p><small>${s ? `一共 ${s.countOf(v)} 张，已经打出 ${seen[v] || 0} 张` : `经典 ${CARDS[v].n} 张 · 扩展 ${CARDS[v].nx} 张`}</small></div></div>`).join("")}
     <p class="note">数字越大越尊贵：牌库摸空时，手里数字大的赢。${s ? "「已经打出」把别人弃掉的牌都算上了，用来推测剩下什么。" : ""}</p></div>`);
-  sheet("八种角色", body);
+  sheet("角色一览", body);
 }
 $("#bCards").onclick = () => openCards(); $("#hCards").onclick = () => openCards(); $("#aCards").onclick = () => openCards();
 $("#hTut").onclick = () => startTutorial(); $("#aTut").onclick = () => startTutorial();
