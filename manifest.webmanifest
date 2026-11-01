@@ -1,6 +1,6 @@
 {
-  "name": "苍澜·乱战",
-  "short_name": "苍澜乱战",
+  "name": "游戏大厅",
+  "short_name": "游戏大厅",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

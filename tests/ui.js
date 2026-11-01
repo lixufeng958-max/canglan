@@ -4,7 +4,7 @@
  * 再测卡牌选目标；若看得见敌军则测「半路截杀」。每局截图到 tests/shots/。 */
 const { chromium } = require("playwright");
 const fs = require("fs"), path = require("path");
-const N = +(process.argv[2] || 4), URL = process.env.URL || "http://127.0.0.1:8765/";
+const N = +(process.argv[2] || 4), URL = process.env.URL || "http://127.0.0.1:8765/luanzhan/";
 const shots = path.join(__dirname, "shots"); fs.mkdirSync(shots, { recursive: true });
 (async () => {
   const br = await chromium.launch();

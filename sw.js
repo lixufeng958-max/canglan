@@ -1,9 +1,11 @@
-// 离线缓存：先用网络取最新版，断网时用缓存
-const CACHE = "lanzhan-v18";
-const FILES = ["./", "./index.html", "./app.js", "./sim.js", "./bots.js", "./render.js", "./net.js", "./audio.js", "./icons.js", "./config.js", "./manifest.webmanifest", "./icon-180.png", "./icon-192.png", "./icon-512.png"];
+// 游戏大厅的离线缓存：只管大厅这一页；各个游戏有自己的 sw.js
+const CACHE = "hub-v1";
+const FILES = ["./", "./index.html", "./manifest.webmanifest", "./icon-180.png", "./icon-192.png", "./icon-512.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES))); self.skipWaiting(); });
 self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))); self.clients.claim(); });
 self.addEventListener("fetch", e => {
-  if (e.request.method !== "GET" || new URL(e.request.url).origin !== location.origin) return;
+  const url = new URL(e.request.url);
+  if (e.request.method !== "GET" || url.origin !== location.origin) return;
+  if (url.pathname.split("/").length > 2 && !FILES.some(f => url.pathname.endsWith(f.slice(1)))) return; // 游戏目录里的文件交给游戏自己的 sw
   e.respondWith(fetch(e.request).then(r => { if (r.ok) caches.open(CACHE).then(c => c.put(e.request, r.clone())); return r; }).catch(() => caches.match(e.request, { ignoreSearch: true })));
 });

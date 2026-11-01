@@ -2,7 +2,7 @@
  * 跑多局电脑对战（含截杀），记录事件；用同一事件列表重放，世界状态必须逐位一致。
  * 顺便做一次“存档点回滚”：从中途存档恢复后再推到终点，也必须一致。 */
 const fs = require("fs"), path = require("path"), vm = require("vm");
-const root = path.join(__dirname, "..");
+const root = path.join(__dirname, "..", "luanzhan");
 const G = { window: undefined };
 G.globalThis = G;
 vm.createContext(G);

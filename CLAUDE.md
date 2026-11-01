@@ -6,12 +6,21 @@
 - 改完后要给出能直接部署的结果，并说明怎么更新。
 
 ## 这是什么
-一个纯前端网页游戏（PWA），**写实地形地图、深色战争风界面**的实时国战卡牌策略游戏（v17 起不再是水墨风）。
-- 线上地址：https://donglin-luanzhan.netlify.app （Netlify 团队 lin-ma-c62r488，站点 donglin-luanzhan）
+网站根目录是一个**游戏大厅**（`index.html`，总入口，列出所有游戏），每个游戏放在自己的文件夹里。目前只有一个游戏：
+`luanzhan/` = 苍澜·乱战，一个纯前端网页游戏（PWA），**写实地形地图、深色战争风界面**的实时国战卡牌策略游戏（v17 起不再是水墨风）。
+- 线上地址：https://donglin-luanzhan.netlify.app （大厅）、https://donglin-luanzhan.netlify.app/luanzhan/ （游戏）。Netlify 团队 lin-ma-c62r488，站点 donglin-luanzhan，已连 GitHub 仓库 main 分支，推送即自动上线。
+- **加新游戏**：新建一个文件夹放进去（文件里只用相对路径），再在根 `index.html` 的 `<main>` 里照着苍澜那张卡片抄一张（封面图、名字、简介、链接）。根目录的 `sw.js` 只缓存大厅本身，游戏目录里的请求交给各游戏自己的 `sw.js`。
 - 联机：Firebase（项目 tianxia-a53f0），邮箱密码登录 + Firestore。配置在 `config.js`，规则在 `firestore.rules`。
-- 没有构建步骤：所有文件原样上传即可。改了任何文件都要把 `sw.js` 里的 `CACHE` 版本号 +1，否则手机会读旧缓存。
+- 没有构建步骤：所有文件原样上传即可。改了游戏里任何文件都要把 `luanzhan/sw.js` 里的 `CACHE` 版本号 +1（改大厅则是根目录 `sw.js`），否则手机会读旧缓存。
 
-## 文件
+## 文件（根目录）
+| 文件 | 作用 |
+|---|---|
+| `index.html` | 游戏大厅 |
+| `sw.js` / `manifest.webmanifest` / `icon-*.png` | 大厅的离线缓存与主屏幕图标 |
+| `tests/` | `sim-replay.js` 推演一致性测试；`ui.js` Playwright 界面测试（不会上线，但一起上传也无妨） |
+
+## 文件（`luanzhan/`，苍澜·乱战）
 | 文件 | 作用 |
 |---|---|
 | `sim.js` | **确定性推演引擎**（地图生成、规则、卡牌、兵种、天时、战斗）。导出 `window.LZ` |
@@ -21,7 +30,7 @@
 | `render.js` | Canvas 渲染：写实地形（海拔着色+光照+雪顶、森林树冠、沼泽、河流海岸）、按民风/人口画出贫富强弱的城池、兵团小人、特效 |
 | `audio.js` | Web Audio 现场合成的背景乐与音效（无音频文件）：太鼓、号角、战吼、低音弦 |
 | `icons.js` | 43 张卡牌的 SVG 线描插图 |
-| `tests/` | `sim-replay.js` 推演一致性测试；`ui.js` Playwright 界面测试（不会上线，但一起上传也无妨） |
+| `cover.jpg` | 大厅里的封面图（Playwright 截的地图） |
 | `index.html` | 全部样式与页面结构 |
 | `sw.js` | 离线缓存（网络优先） |
 
@@ -51,10 +60,10 @@
 
 ## 测试
 - 推演一致性：`node tests/sim-replay.js`（跑 5 局电脑对战，重放 + 中途回滚，状态必须逐位一致）。
-- 界面：`python3 -m http.server 8765` 起本地服务，再 `node tests/ui.js 4`（手机视口 390×844，`hasTouch`，连开 4 局，截图在 `tests/shots/`）。单机模式不需要 Firebase。
+- 界面：在仓库根目录 `python3 -m http.server 8765` 起本地服务，再 `node tests/ui.js 4`（打开的是 `/luanzhan/`）（手机视口 390×844，`hasTouch`，连开 4 局，截图在 `tests/shots/`）。单机模式不需要 Firebase。
   - 测试里直接改 `G.sim` 状态前要先把 `G.lag` 调大（如 3）并 `clearInterval(G.botTimer)` 停掉电脑，否则事件触发的回滚会把改动抹掉；`G.lag` 要等开局 5 秒后再调，不然倒计时遮罩会盖住地图。手动 `G.sim.tick()` 快进后更要确保没有新事件进来。
 - 背景乐：浏览器里 `LZAudio.renderOffline(秒数, "war")` 可离线渲染一段，检查有声、不报错。
 
 ## 部署
-- 目前用户是把整个文件夹拖到 Netlify 的 Deploys 页面手动上传。
-- 如果仓库已连到 Netlify，推送到 GitHub 主分支就会自动上线。
+- Netlify 已连接 GitHub 仓库：推送到 main 分支几分钟后自动上线，不需要手动上传。
+- 手机上要看到新版：把游戏完全关掉再打开（缓存版本号已 +1 的前提下）。
