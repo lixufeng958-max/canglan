@@ -34,7 +34,7 @@ function Sim(cfg) {
   this.P = {}; cfg.players.forEach((p, i) => { this.P[p.id] = { id: p.id, name: p.name, color: p.color || COLORS[i], bot: !!p.bot, tokens: 0 }; });
   this.nP = this.order.length; this.ext = this.nP >= 5; this.need = TOKENS[this.nP] || 3;
   this.values = Object.keys(CARDS).map(Number).filter(v => countOf(v, this.nP) > 0);
-  this.round = 0; this.over = null; this.log = []; this.applied = new Set(); this.n = 0;
+  this.round = 0; this.over = null; this.log = []; this.fx = []; this.applied = new Set(); this.n = 0;
   this.startRound();
 }
 Sim.prototype.L = function (text, vis, kind) { this.log.push({ n: this.n++, round: this.round, text, vis: vis || "all", kind: kind || "" }); };
@@ -109,28 +109,34 @@ Sim.prototype.apply = function (ev) {
   if (C.tgt !== "none" && ts.length && t == null) return; // 有目标可选就必须选
   s.hand.splice(s.hand.indexOf(card), 1); s.disc.push(card);
   this.L(`${this.name(p)}打出「${C.name}」${t != null ? "→ " + this.name(t) : ""}`, "all", "play");
+  const wasOut = Object.fromEntries(this.order.map(q => [q, this.S[q].out])), F = { n: this.n, by: p, card, t, round: this.round };
   if (t == null && C.tgt !== "none") { this.L("没有可以选的目标，这张牌没有效果", "all"); }
   else switch (card) {
     case 0: this.L(`${this.name(p)}埋下了一名细作`, "all"); break;
-    case 1: { const g = +a.guess; if (!(this.guessable().includes(g))) { this.L("猜测无效", "all"); break; } this.L(`${this.name(p)}猜${this.name(t)}拿的是「${CARDS[g].name}」`, "all"); if (this.S[t].hand[0] === g) this.knock(t, "被猜中了"); else this.L("没猜中", "all"); break; }
-    case 2: { const v = this.S[t].hand[0]; s.know[t] = v; this.L(`你看到${this.name(t)}的手牌是「${CARDS[v].name}」`, [p], "secret"); this.L(`${this.name(p)}偷看了${this.name(t)}的手牌`, this.order.filter(q => q !== p)); break; }
-    case 3: { const mine = s.hand[0], theirs = this.S[t].hand[0]; s.know[t] = theirs; this.S[t].know[p] = mine;
+    case 1: { const g = +a.guess; if (!(this.guessable().includes(g))) { this.L("猜测无效", "all"); break; } F.guess = g; this.L(`${this.name(p)}猜${this.name(t)}拿的是「${CARDS[g].name}」`, "all"); if (this.S[t].hand[0] === g) { F.hit = true; this.knock(t, "被猜中了"); } else { F.note = "没猜中"; this.L("没猜中", "all"); } break; }
+    case 2: { const v = this.S[t].hand[0]; s.know[t] = v; F.secret = { [p]: v }; F.note = "偷看了手牌"; this.L(`你看到${this.name(t)}的手牌是「${CARDS[v].name}」`, [p], "secret"); this.L(`${this.name(p)}偷看了${this.name(t)}的手牌`, this.order.filter(q => q !== p)); break; }
+    case 3: { const mine = s.hand[0], theirs = this.S[t].hand[0]; s.know[t] = theirs; this.S[t].know[p] = mine; F.secret = { [p]: theirs, [t]: mine }; F.note = mine === theirs ? "比牌平手" : "暗中比牌";
       this.L(`比牌：你「${CARDS[mine].name}」对${this.name(t)}「${CARDS[theirs].name}」`, [p], "secret"); this.L(`比牌：你「${CARDS[theirs].name}」对${this.name(p)}「${CARDS[mine].name}」`, [t], "secret");
       if (mine > theirs) this.knock(t, "比牌输了"); else if (theirs > mine) this.knock(p, "比牌输了"); else this.L("比牌平手，无事发生", "all"); break; }
-    case 4: { s.safe = true; this.L(`${this.name(p)}受到侍女保护`, "all"); break; }
-    case 5: { const v = this.S[t].hand[0]; this.S[t].hand = []; this.S[t].disc.push(v); this.L(`${this.name(t)}弃掉了「${CARDS[v].name}」`, "all");
+    case 4: { s.safe = true; F.note = "受到保护，直到下回合"; this.L(`${this.name(p)}受到侍女保护`, "all"); break; }
+    case 5: { const v = this.S[t].hand[0]; this.S[t].hand = []; this.S[t].disc.push(v); F.show = v; F.note = `弃掉了「${CARDS[v].name}」`; this.L(`${this.name(t)}弃掉了「${CARDS[v].name}」`, "all");
       if (v === 9) this.knock(t, "弃掉了公主"); else { this.S[t].hand.push(this.deck.length ? this.deck.pop() : this.aside); if (!this.deck.length) this.aside = -1; for (const q of this.order) delete this.S[q].know[t]; } break; }
     case 6: { // 国公：摸 2 张，留 1 张，其余放回牌库底（等玩家决定）
       const got = []; while (got.length < 2 && this.deck.length) got.push(this.deck.pop());
-      if (!got.length) { this.L("牌库空了，国公无牌可摸", "all"); break; }
+      if (!got.length) { F.note = "牌库空了，无牌可摸"; this.L("牌库空了，国公无牌可摸", "all"); break; }
+      F.note = `摸了 ${got.length} 张，挑一张留下`; F.draw = got.length; this.fx.push(F);
       s.hand.push(...got); this.phase = "chancellor"; this.L(`${this.name(p)}摸了 ${got.length} 张，正在挑选留下哪张`, "all");
       for (const q of this.order) delete this.S[q].know[p];
       return; // 这一回合还没结束，等 keep 事件
     }
-    case 7: { const mine = s.hand[0], theirs = this.S[t].hand[0]; s.hand = [theirs]; this.S[t].hand = [mine]; s.know[t] = mine; this.S[t].know[p] = theirs; this.L(`${this.name(p)}和${this.name(t)}交换了手牌`, "all"); this.L(`你换到了「${CARDS[theirs].name}」`, [p], "secret"); this.L(`你换到了「${CARDS[mine].name}」`, [t], "secret"); break; }
-    case 8: break;
+    case 7: { const mine = s.hand[0], theirs = this.S[t].hand[0]; s.hand = [theirs]; this.S[t].hand = [mine]; s.know[t] = mine; this.S[t].know[p] = theirs; F.secret = { [p]: theirs, [t]: mine }; F.note = "交换了手牌"; this.L(`${this.name(p)}和${this.name(t)}交换了手牌`, "all"); this.L(`你换到了「${CARDS[theirs].name}」`, [p], "secret"); this.L(`你换到了「${CARDS[mine].name}」`, [t], "secret"); break; }
+    case 0: F.note = "埋下细作"; break;
+    case 8: F.note = "不得不打出皇后"; break;
     case 9: this.knock(p, "弃掉了公主"); break;
   }
+  if (card === 0 && t == null) F.note = "埋下细作";
+  F.knocked = this.order.filter(q => this.S[q].out && !wasOut[q]);
+  if (card !== 6 || F.draw == null) this.fx.push(F);
   if (!s.out) delete s.know[p];
   this.endTurn();
 };

@@ -95,7 +95,7 @@ function startGame(net, room) {
 function leaveGame(silent) {
   if (!G) return; tutEnd();
   G.unEv && G.unEv(); G.unRoom && G.unRoom(); clearInterval(G.timer);
-  document.querySelectorAll(".scrim").forEach(s => s.remove()); $("#toasts").innerHTML = "";
+  document.querySelectorAll(".scrim").forEach(s => s.remove()); $("#toasts").innerHTML = ""; $("#fx").innerHTML = ""; FXQ.length = 0; fxBusy = false;
   G = null; if (!silent) ONLINE ? openHome() : openAuth();
 }
 /* 事件按服务器时间排好序，每次都从头重算整局（牌局很短，几百条事件瞬间算完） */
@@ -104,7 +104,7 @@ function onEvents(list) {
   const evs = list.slice().sort((a, b) => a.ts - b.ts || (a.id < b.id ? -1 : 1));
   const sim = new Sim(G.cfg); sim.run(evs);
   G.events = evs; G.sim = sim; G.pick = null;
-  render(); pumpLog();
+  render(); pumpLog(); pumpFx();
   if (sim.over && !G.ended) endGame();
 }
 function send(type, a) { if (!G || G.sim.over) return; G.net.sendEvent(G.code, { by: G.me, type, a: a || {} }).catch(e => toast("发送失败：" + e.message, "bad")); }
@@ -124,8 +124,67 @@ function pumpLog() {
   for (; G.seenLog < s.log.length; G.seenLog++) {
     const l = s.log[G.seenLog]; if (l.vis !== "all" && !l.vis.includes(G.me)) continue;
     if (l.kind === "turn") continue;
-    if (l.kind === "secret") { toast(l.text, "secret"); AU("play", "secret"); } else if (l.kind === "out" || l.kind === "phase") { toast(l.text, l.kind === "out" ? "bad" : "good"); AU("play", l.kind === "out" ? "out" : l.text.includes("❤") || l.text.includes("🕵") ? "heart" : "play"); } else if (l.kind === "play") AU("play", "play"); else toast(l.text);
+    if (l.kind === "secret") { toast(l.text, "secret"); AU("play", "secret"); } else if (l.kind === "phase") { toast(l.text, "good"); AU("play", l.text.includes("❤") || l.text.includes("🕵") ? "heart" : "play"); } else if (l.kind === "out") AU("play", "out"); else if (l.kind === "play") AU("play", "play");
   }
+}
+
+/* ---------- 出牌动画：按顺序一条条播，每条约 1.8 秒 ---------- */
+const FXQ = []; let fxBusy = false;
+function pumpFx() {
+  const s = G.sim; if (G.seenFx == null) G.seenFx = s.fx.length; // 中途进来的不补播旧的
+  for (; G.seenFx < s.fx.length; G.seenFx++) FXQ.push(s.fx[G.seenFx]);
+  if (!fxBusy) fxNext();
+}
+function fxNext() { const f = FXQ.shift(); if (!f || !G) { fxBusy = false; return; } fxBusy = true; playFx(f).then(fxNext, fxNext); }
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+// 某个玩家在屏幕上的位置（对手是座位头像，自己是底部名牌）
+function posOf(p) {
+  const e = p === G.me ? $("#me-name") : document.querySelector(`.seat[data-p="${p}"] .av`);
+  if (!e) return { x: innerWidth / 2, y: innerHeight / 2 };
+  const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+}
+function seatEl(p) { return p === G.me ? document.querySelector(".me") : document.querySelector(`.seat[data-p="${p}"]`); }
+async function playFx(f) {
+  const s = G.sim, me = G.me, layer = $("#fx"); if (!layer || !s.P[f.by]) return;
+  const C = CARDS[f.card], from = posOf(f.by), cx = innerWidth / 2, cy = Math.min(innerHeight * .42, innerHeight - 330);
+  layer.innerHTML = "";
+  // 1. 牌从出牌人飞到中央放大
+  const big = el(`<div class="big">${cardHTML(f.card)}</div>`); layer.append(big);
+  const bw = 118, bh = 172;
+  big.animate([{ transform: `translate(${from.x - bw / 2}px,${from.y - bh / 2}px) scale(.3)`, opacity: .2 }, { transform: `translate(${cx - bw / 2}px,${cy - bh / 2}px) scale(1)`, opacity: 1 }], { duration: 420, easing: "cubic-bezier(.2,.8,.3,1)", fill: "forwards" });
+  const cap = el(`<div class="cap"><i>${esc(s.P[f.by].name)}</i> 打出「${C.name}」${f.t != null ? ` → <i>${esc(s.P[f.t].name)}</i>` : ""}</div>`);
+  cap.style.top = cy + bh / 2 + 10 + "px"; layer.append(cap); cap.animate([{ opacity: 0, transform: "translate(-50%,8px)" }, { opacity: 1, transform: "translate(-50%,0)" }], { duration: 300, delay: 250, fill: "both" });
+  await sleep(480);
+  // 2. 有目标：画箭头，目标震一下
+  if (f.t != null) {
+    const to = posOf(f.t), sx = cx, sy = cy + (to.y > cy ? bh / 2 : -bh / 2);
+    const mx = (sx + to.x) / 2 + (to.y > cy ? 40 : -40), my = (sy + to.y) / 2;
+    const ang = Math.atan2(to.y - my, to.x - mx), hx = to.x - Math.cos(ang) * 22, hy = to.y - Math.sin(ang) * 22;
+    const svg = el(`<svg class="arrow"><path d="M${sx} ${sy} Q${mx} ${my} ${hx} ${hy}"/><polygon class="head" points="0,-9 18,0 0,9" transform="translate(${hx},${hy}) rotate(${ang * 180 / Math.PI})"/></svg>`);
+    layer.append(svg);
+    const path = svg.querySelector("path"), L = path.getTotalLength(); path.style.strokeDasharray = L; path.style.strokeDashoffset = L;
+    path.animate([{ strokeDashoffset: L }, { strokeDashoffset: 0 }], { duration: 380, easing: "ease-out", fill: "forwards" });
+    svg.querySelector(".head").animate([{ opacity: 0 }, { opacity: 0 }, { opacity: 1 }], { duration: 400, fill: "forwards" });
+    await sleep(400);
+    const se = seatEl(f.t); if (se) { se.classList.add("hit"); setTimeout(() => se.classList.remove("hit"), 600); }
+  }
+  // 3. 结果
+  const at = f.t != null ? posOf(f.t) : from, res = [];
+  const put = (html, cls, dy = 0, where = at) => { const r = el(`<div class="res ${cls}">${html}</div>`); r.style.left = Math.max(96, Math.min(innerWidth - 96, where.x)) + "px"; r.style.top = Math.max(70, where.y - 34 + dy) + "px"; layer.append(r); r.animate([{ opacity: 0, transform: "translate(-50%,-30%) scale(.6)" }, { opacity: 1, transform: "translate(-50%,-50%) scale(1)" }], { duration: 260, easing: "cubic-bezier(.2,.8,.3,1.3)", fill: "forwards" }); res.push(r); return r; };
+  if (f.guess != null) put(`猜「${CARDS[f.guess].name}」${f.hit ? "" : " · 没猜中"}`, f.hit ? "good" : "");
+  if (f.secret && f.secret[me] != null && (f.by === me || f.t === me)) { const v = f.secret[me]; put(`${f.card === 7 ? "换到" : f.card === 3 ? "对方是" : "看到"} ${cardHTML(v, "mini")}`, "good", f.guess != null ? -40 : 0, f.card === 7 && f.t === me ? posOf(me) : f.card === 3 ? posOf(f.by === me ? f.t : f.by) : at); }
+  else if (f.note && f.card !== 4 && f.guess == null) put(esc(f.note), "", 0, f.t != null ? at : from);
+  if (f.show != null && f.card === 5) put(cardHTML(f.show, "mini"), "", 36);
+  if (f.card === 4) { const ring = el(`<div class="ring"></div>`); ring.style.left = from.x + "px"; ring.style.top = from.y + "px"; layer.append(ring); ring.animate([{ width: "20px", height: "20px", opacity: 1 }, { width: "120px", height: "120px", opacity: 0 }], { duration: 900, easing: "ease-out", fill: "forwards" }); put("侍女保护", "pink", 0, from); }
+  if (f.card === 6 && f.draw) { const dk = document.querySelector(".deck .card"); const d0 = dk ? dk.getBoundingClientRect() : null; for (let i = 0; i < f.draw; i++) { const b = el(`<div class="big">${backHTML("mini")}</div>`); layer.append(b); const x0 = d0 ? d0.left : cx, y0 = d0 ? d0.top : cy; b.animate([{ transform: `translate(${x0}px,${y0}px)`, opacity: 1 }, { transform: `translate(${from.x - 28 + i * 30}px,${from.y - 41}px)`, opacity: .9 }], { duration: 500, delay: i * 140, easing: "ease-out", fill: "forwards" }); } }
+  for (const q of f.knocked || []) { await sleep(260); const kp = posOf(q); put("✖ 出局", "bad", -4, kp); const hb = el(`<div class="heartbreak">💔</div>`); hb.style.left = kp.x + "px"; hb.style.top = kp.y + "px"; layer.append(hb); hb.animate([{ transform: "translate(-50%,-50%) scale(.4)", opacity: 0 }, { transform: "translate(-50%,-130%) scale(1.3)", opacity: 1 }, { transform: "translate(-50%,-200%) scale(1)", opacity: 0 }], { duration: 1100, fill: "forwards" }); const se = seatEl(q); if (se) { se.classList.add("hit"); setTimeout(() => se.classList.remove("hit"), 600); } }
+  await sleep(1150);
+  // 4. 收尾：牌缩回出牌人的弃牌堆，结果标签淡出
+  const dp = f.by === me ? $("#me-disc") : document.querySelector(`.seat[data-p="${f.by}"] .dpile`); const dr = dp ? dp.getBoundingClientRect() : null;
+  const tx = dr ? dr.left + dr.width / 2 : from.x, ty = dr ? dr.top + dr.height / 2 : from.y;
+  big.animate([{ transform: `translate(${cx - bw / 2}px,${cy - bh / 2}px) scale(1)`, opacity: 1 }, { transform: `translate(${tx - bw / 2}px,${ty - bh / 2}px) scale(.3)`, opacity: 0 }], { duration: 380, easing: "ease-in", fill: "forwards" });
+  for (const r of [cap, ...res, ...layer.querySelectorAll(".arrow,.ring")]) r.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, delay: 120, fill: "forwards" });
+  await sleep(420); layer.innerHTML = "";
 }
 
 /* ---------- 画面 ---------- */
