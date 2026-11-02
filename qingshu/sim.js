@@ -67,22 +67,25 @@ Sim.prototype.beginTurn = function () {
 Sim.prototype.endTurn = function () {
   const alive = this.alive();
   if (alive.length <= 1) return this.endRound(alive[0], "最后的幸存者");
-  if (!this.deck.length) { // 牌库摸空：比手牌，大的赢；平手比弃牌总和
-    let best = null;
-    for (const p of alive) { const v = this.S[p].hand[0], sum = this.S[p].disc.reduce((a, b) => a + b, 0); if (!best || v > best.v || (v === best.v && sum > best.sum)) best = { p, v, sum }; }
+  if (!this.deck.length) { // 牌库摸空：所有人亮牌比大小，一样大就一起赢
+    const max = Math.max(...alive.map(p => this.S[p].hand[0])), ws = alive.filter(p => this.S[p].hand[0] === max);
     for (const p of alive) this.L(`${this.name(p)}亮出手牌：${CARDS[this.S[p].hand[0]].name}`, "all");
-    return this.endRound(best.p, "牌库摸空，手牌最大");
+    this.fx.push({ n: this.n, kind: "showdown", round: this.round, hands: Object.fromEntries(alive.map(p => [p, this.S[p].hand[0]])), winners: ws, aside: this.aside });
+    return this.endRound(ws, ws.length > 1 ? "牌库摸空，手牌一样大，平局" : "牌库摸空，手牌最大");
   }
   this.turn = (this.turn + 1) % this.nP;
   this.beginTurn();
 };
 Sim.prototype.endRound = function (w, why) {
-  this.phase = "roundEnd"; this.winner = w; this.lastWinner = w;
-  if (w) { this.P[w].tokens++; this.L(`❤ ${this.name(w)}赢得这一轮（${why}），情书送达 ${this.P[w].tokens}/${this.need}`, "all", "phase"); }
+  const ws = Array.isArray(w) ? w : w ? [w] : [];
+  this.phase = "roundEnd"; this.winner = ws[0] || null; this.winners = ws; this.lastWinner = ws[0] || this.lastWinner;
+  for (const q of ws) this.P[q].tokens++;
+  if (ws.length) this.L(`❤ ${ws.map(q => this.name(q)).join("、")}赢得这一轮（${why}），情书送达 ${ws.map(q => this.P[q].tokens + "/" + this.need).join("、")}`, "all", "phase");
   // 细作：还在局中的人里唯一用过细作的，额外得一颗
   if (this.ext) { const spies = this.alive().filter(p => this.S[p].disc.includes(0)); if (spies.length === 1) { this.P[spies[0]].tokens++; this.L(`🕵 ${this.name(spies[0])}的细作立功，额外得一颗 ❤（${this.P[spies[0]].tokens}/${this.need}）`, "all", "phase"); } }
-  this.roundResult = { w, why, hands: Object.fromEntries(this.order.map(p => [p, this.S[p].hand.slice()])) };
-  const champ = this.order.filter(p => this.P[p].tokens >= this.need).sort((a, b) => this.P[b].tokens - this.P[a].tokens || (a === w ? -1 : 1))[0];
+  this.roundResult = { w: ws[0] || null, ws, why, aside: this.aside, hands: Object.fromEntries(this.order.map(p => [p, this.S[p].hand.slice()])) };
+  this.L(this.aside >= 0 ? `这一轮的暗牌是「${CARDS[this.aside].name}」` : "这一轮的暗牌已被太子摸走", "all", "phase");
+  const champ = this.order.filter(p => this.P[p].tokens >= this.need).sort((a, b) => this.P[b].tokens - this.P[a].tokens || (ws.includes(a) ? -1 : 1))[0];
   if (champ) { this.over = { w: champ }; this.phase = "over"; this.L(`👑 ${this.name(champ)}赢得公主的芳心！`, "all", "phase"); }
 };
 Sim.prototype.knock = function (p, why) { const s = this.S[p]; s.out = true; s.disc.push(...s.hand); s.hand = []; this.L(`✖ ${this.name(p)}出局（${why}）`, "all", "out"); };
@@ -131,7 +134,7 @@ Sim.prototype.apply = function (ev) {
     }
     case 7: { const mine = s.hand[0], theirs = this.S[t].hand[0]; s.hand = [theirs]; this.S[t].hand = [mine]; s.know[t] = mine; this.S[t].know[p] = theirs; F.secret = { [p]: theirs, [t]: mine }; F.note = "交换了手牌"; this.L(`${this.name(p)}和${this.name(t)}交换了手牌`, "all"); this.L(`你换到了「${CARDS[theirs].name}」`, [p], "secret"); this.L(`你换到了「${CARDS[mine].name}」`, [t], "secret"); break; }
     case 0: F.note = "埋下细作"; break;
-    case 8: F.note = "不得不打出皇后"; break;
+    case 8: break;
     case 9: this.knock(p, "弃掉了公主"); break;
   }
   if (card === 0 && t == null) F.note = "埋下细作";

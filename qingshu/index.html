@@ -177,6 +177,12 @@ input{font:inherit;font-size:16px;color:var(--text);background:var(--card);borde
 .fx .ring{position:absolute;transform:translate(-50%,-50%);border-radius:50%;border:3px solid var(--c4);box-shadow:0 0 20px var(--c4)}
 .seat.hit .av,.me.hit .who i{animation:shake .5s ease-in-out}
 @keyframes shake{20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+.fx .big.sd{transform-style:preserve-3d}.fx .big.sd .card{width:72px;height:105px;transition:box-shadow .3s}.fx .big.sd .card .art{width:40px;height:40px;margin-top:18px}.fx .big.sd .card b{font-size:13px}.fx .big.sd .card small{font-size:8px}
+.fx .big.sd .who{margin-top:4px;text-align:center;font-size:11px;font-family:var(--display);white-space:nowrap}.fx .big.sd .who i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:3px}
+.fx .big.sd.win .card{box-shadow:0 0 0 2px var(--gold),0 0 30px rgba(217,169,58,.9)}.fx .big.sd.lose{opacity:.45;filter:grayscale(.5)}
+.fx .big.sd .tag{position:absolute;left:50%;top:-14px;transform:translateX(-50%);white-space:nowrap;background:var(--gold);color:#1C1218;font-family:var(--display);font-weight:900;font-size:12px;padding:1px 8px;border-radius:10px}
+.deck.aside .card.mini{opacity:.85}.deck.aside .lbl small{font-size:9px}
+.rv.winner b{color:var(--gold)}
 .fx .heartbreak{position:absolute;transform:translate(-50%,-50%);font-size:34px}
 /* ---------- 弹出层 ---------- */
 .scrim{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center}
@@ -302,6 +308,7 @@ input{font:inherit;font-size:16px;color:var(--text);background:var(--card);borde
     <div class="center">
       <div class="row2">
         <div class="deck"><div class="card mini back"><i class="fr"></i><div class="seal">情<br>书</div></div><div class="lbl">牌库 <b id="deckN">0</b> 张</div></div>
+        <div class="deck aside"><div id="aside"></div><div class="lbl">暗牌<br><small>轮末公布</small></div></div>
         <div class="pile"><div class="lbl">场上弃牌（点人名看各自的）</div><div class="chips" id="pile"></div></div>
       </div>
       <div id="faceUpBox" hidden><div class="faceup" id="faceUp"></div><div class="lbl">明牌（不在局中）</div></div>

@@ -112,7 +112,7 @@ function send(type, a) { if (!G || G.sim.over) return; G.net.sendEvent(G.code, {
 function tickBots() {
   if (!G || !G.host || G.sim.over) return;
   const s = G.sim, now = Date.now();
-  if (s.phase === "roundEnd") { if (!G.roundEndAt) G.roundEndAt = now; if (now - G.roundEndAt > 4500) { G.roundEndAt = 0; send("next"); } return; }
+  if (s.phase === "roundEnd") { if (!G.roundEndAt) G.roundEndAt = now; if (now - G.roundEndAt > 8500) { G.roundEndAt = 0; send("next"); } return; }
   G.roundEndAt = 0;
   const p = s.cur(); if (!s.P[p].bot) return;
   if (!G.botAt) { G.botAt = now + 1400 + Math.random() * 1200; return; }
@@ -135,7 +135,28 @@ function pumpFx() {
   for (; G.seenFx < s.fx.length; G.seenFx++) FXQ.push(s.fx[G.seenFx]);
   if (!fxBusy) fxNext();
 }
-function fxNext() { const f = FXQ.shift(); if (!f || !G) { fxBusy = false; return; } fxBusy = true; playFx(f).then(fxNext, fxNext); }
+function fxNext() { const f = FXQ.shift(); if (!f || !G) { fxBusy = false; maybeShowRound(); return; } fxBusy = true; (f.kind === "showdown" ? playShowdown(f) : playFx(f)).then(fxNext, fxNext); }
+function maybeShowRound() { if (!G) return; const s = G.sim; if (s.phase === "roundEnd" && !s.over && G.shownRound !== s.round && !fxBusy) { G.shownRound = s.round; showRound(); } }
+// 牌库摸空：每个人翻开手牌，飞到中央排成一排比大小
+async function playShowdown(f) {
+  const s = G.sim, layer = $("#fx"); if (!layer) return; layer.innerHTML = "";
+  const ps = Object.keys(f.hands), cx = innerWidth / 2, cy = Math.min(innerHeight * .42, innerHeight - 330), w = 72, h = 105, gap = Math.min(84, (innerWidth - 40) / ps.length);
+  const cap = el(`<div class="cap">牌库摸空 · <i>亮牌比大小</i></div>`); cap.style.top = cy - h / 2 - 48 + "px"; layer.append(cap);
+  const cards = [];
+  for (let i = 0; i < ps.length; i++) {
+    const p = ps[i], v = f.hands[p], from = posOf(p), tx = cx + (i - (ps.length - 1) / 2) * gap - w / 2, ty = cy - h / 2;
+    const c = el(`<div class="big sd">${cardHTML(v)}<div class="who"><i style="background:${s.P[p].color}"></i>${esc(s.P[p].name)}</div></div>`); layer.append(c); cards.push(c);
+    c.animate([{ transform: `translate(${from.x - w / 2}px,${from.y - h / 2}px) scale(.5) rotateY(180deg)`, opacity: .3 }, { transform: `translate(${tx}px,${ty}px) scale(1) rotateY(0deg)`, opacity: 1 }], { duration: 520, delay: i * 160, easing: "cubic-bezier(.2,.8,.3,1)", fill: "forwards" });
+    AU("play", "play"); await sleep(170);
+  }
+  await sleep(700);
+  const max = Math.max(...ps.map(p => f.hands[p]));
+  ps.forEach((p, i) => { const c = cards[i]; if (f.hands[p] === max) { c.classList.add("win"); const tag = el(`<div class="tag">${f.winners.length > 1 ? "平局" : "最大"}</div>`); c.append(tag); } else c.classList.add("lose"); });
+  const res = el(`<div class="cap">${f.winners.length > 1 ? "一样大，" + f.winners.map(p => esc(s.P[p].name)).join("、") + " 一起得 ❤" : esc(s.P[f.winners[0]].name) + " 的牌最大，得 ❤"}</div>`); res.style.top = cy + h / 2 + 34 + "px"; layer.append(res);
+  AU("play", "heart"); await sleep(2200);
+  for (const c of [cap, res, ...cards]) c.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 350, fill: "forwards" });
+  await sleep(380); layer.innerHTML = "";
+}
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 // 某个玩家在屏幕上的位置（对手是座位头像，自己是底部名牌）
 function posOf(p) {
@@ -222,6 +243,7 @@ function render() {
   $("#pile").innerHTML = s.values.map(v => { const k = played[v] || 0; return `<span class="chip c${v} ${k ? "" : "left"}"><i>${v}</i>${CARDS[v].name}<em>${k}/${s.countOf(v)}</em></span>`; }).join("");
   // 桌面
   $("#deckN").textContent = s.deck.length; $("#round").textContent = `第 ${s.round} 轮`;
+  $("#aside").innerHTML = s.aside >= 0 ? backHTML("mini") : `<div class="card mini gone">已摸走</div>`;
   $("#faceUp").innerHTML = s.faceUp.map(v => cardHTML(v, "mini")).join("");
   $("#faceUpBox").hidden = !s.faceUp.length;
   $("#faceUpBox").hidden = !s.faceUp.length;
@@ -248,8 +270,11 @@ function render() {
   else st.textContent = `等待${s.P[s.cur()].name}出牌…`;
   $("#hand").classList.toggle("myturn", (myTurn || keeping) && !mine.out);
   $("#deckMode").textContent = s.ext ? "扩展 21 张" : "经典 16 张";
-  // 轮次结算
-  if (s.phase === "roundEnd" && !s.over && G.shownRound !== s.round) { G.shownRound = s.round; showRound(); }
+  // 轮到我：震一下
+  const turnKey = (myTurn || keeping) && !mine.out ? s.round + ":" + s.n : null;
+  if (turnKey && G.vibKey !== turnKey) { G.vibKey = turnKey; if (navigator.vibrate) navigator.vibrate(120); }
+  // 轮次结算（等动画播完）
+  maybeShowRound();
 }
 /* 点某个玩家：看他这一轮弃过的全部牌 */
 function openPlayer(p) {
@@ -288,10 +313,11 @@ function openPlay(card, i) {
 }
 function showRound() {
   const s = G.sim, r = s.roundResult;
-  const body = el(`<div><div class="rwin">❤ ${esc(s.P[r.w].name)} 赢了这一轮</div><p class="note" style="text-align:center">${esc(r.why)}</p>
-    <div class="reveal">${s.order.map(p => `<div class="rv ${s.S[p].out ? "out" : ""}"><i style="background:${s.P[p].color}"></i><b>${esc(s.P[p].name)}</b>${r.hands[p].length ? cardHTML(r.hands[p][0], "mini") : `<div class="card mini gone">出局</div>`}<span class="hearts">${"❤".repeat(s.P[p].tokens)}</span></div>`).join("")}</div>
+  const body = el(`<div><div class="rwin">❤ ${(r.ws || [r.w]).filter(Boolean).map(p => esc(s.P[p].name)).join("、")} 赢了这一轮</div><p class="note" style="text-align:center">${esc(r.why)}</p>
+    <div class="rv" style="margin:6px auto 0"><b>暗牌</b>${r.aside >= 0 ? cardHTML(r.aside, "mini") : '<div class="card mini gone">被太子摸走</div>'}</div>
+    <div class="reveal">${s.order.map(p => `<div class="rv ${s.S[p].out ? "out" : ""} ${(r.ws || []).includes(p) ? "winner" : ""}"><i style="background:${s.P[p].color}"></i><b>${esc(s.P[p].name)}</b>${r.hands[p].length ? cardHTML(r.hands[p][0], "mini") : `<div class="card mini gone">出局</div>`}<span class="hearts">${"❤".repeat(s.P[p].tokens)}</span></div>`).join("")}</div>
     <p class="note" style="text-align:center">先集满 ${s.need} 颗心的人获胜。下一轮几秒后自动开始。</p></div>`);
-  const sh = sheet("本轮结束", body); setTimeout(() => sh.close(), 4200);
+  const sh = sheet("本轮结束", body); setTimeout(() => sh.close(), 4600);
 }
 async function endGame() {
   G.ended = true; const s = G.sim, win = s.over.w === G.me; AU("play", win ? "win" : "lose");
