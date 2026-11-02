@@ -82,7 +82,12 @@ footer .u{color:var(--text)}
     const [app, auth] = await Promise.all([import(FB + "firebase-app.js"), import(FB + "firebase-auth.js")]);
     auth.onAuthStateChanged(auth.getAuth(app.initializeApp(cfg)), u => { if (u) { document.getElementById("who").textContent = "主公 " + (u.displayName || u.email) + " · "; } });
   } catch {}
-  if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("./sw.js").catch(() => {});
+  if ("serviceWorker" in navigator && location.protocol === "https:") {
+    // 有新版本时：不在对局里就立刻刷新；在对局里就等回到首页再刷新。回到前台时也去检查一下有没有新版
+    const had = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register("./sw.js").then(reg => { document.addEventListener("visibilitychange", () => { if (!document.hidden) reg.update().catch(() => {}); }); }).catch(() => {});
+    navigator.serviceWorker.addEventListener("controllerchange", () => { if (!had) return; location.reload(); });
+  }
 })();
 </script>
 </body>

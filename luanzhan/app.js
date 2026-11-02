@@ -38,12 +38,18 @@ let flashT; function flash(text) { const e = $("#aErr") ; console.log(text); con
     let first = true;
     ONLINE.onAuth(u => { if (G) return; if (u) openHome(); else openAuth(); first = false; });
   } else openAuth();
-  if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("./sw.js").catch(() => {});
+  if ("serviceWorker" in navigator && location.protocol === "https:") {
+    // 有新版本时：不在对局里就立刻刷新；在对局里就等回到首页再刷新。回到前台时也去检查一下有没有新版
+    const had = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register("./sw.js").then(reg => { document.addEventListener("visibilitychange", () => { if (!document.hidden) reg.update().catch(() => {}); }); }).catch(() => {});
+    navigator.serviceWorker.addEventListener("controllerchange", () => { if (!had) return; if (typeof G !== "undefined" && G) window.__needReload = true; else location.reload(); });
+  }
 })();
 
 /* ================= 登录 ================= */
 let authMode = "in";
 function openAuth() {
+  if (window.__needReload) return location.reload();
   show("sAuth");
   $("#authOnline").hidden = !ONLINE; $("#authOffline").hidden = !!ONLINE;
 }
@@ -65,6 +71,7 @@ $("#aSolo").onclick = () => startSolo();
 
 /* ================= 首页 ================= */
 async function openHome() {
+  if (window.__needReload) return location.reload();
   show("sHome"); $("#hErr").textContent = "";
   const net = ONLINE || LOCAL;
   $("#hOut").hidden = !ONLINE; $("#hCreate").disabled = !ONLINE; $("#hJoin").disabled = !ONLINE;

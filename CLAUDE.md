@@ -69,4 +69,5 @@
 ## 部署
 - 推送到 GitHub main 分支即可，GitHub Pages 1–2 分钟后自动上线。尽量把改动攒在一起再推。
 - 情书登录页/首页底部有版本号（`qingshu/app.js` 的 `VERSION`），每次改情书都顺手改一下，方便用户确认拿到的是新版。
-- 手机上要看到新版：把游戏完全关掉再打开（缓存版本号已 +1 的前提下）。
+- 三个 `sw.js` 都用 `fetch(url, {cache:"no-cache"})`，绕过 GitHub Pages 默认 10 分钟的浏览器缓存。页面监听 `controllerchange`：发现新版时不在对局里就自动刷新，在对局里就等回到首页（`openHome/openAuth` 检查 `window.__needReload`）；回到前台时 `reg.update()` 检查新版。
+- iPhone 主屏幕 App 和 Safari 的缓存是分开的。万一主屏幕卡在旧版：删掉图标，从 Safari 重新添加。

@@ -5,7 +5,7 @@ const $ = s => document.querySelector(s);
 const el = h => { const t = document.createElement("template"); t.innerHTML = h.trim(); return t.content.firstElementChild; };
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 let ONLINE = null, LOCAL = new QSNet.LocalNet(), NET = null, G = null;
-const VERSION = "情书 v10 · 布局自适应"; // 每次更新改一下，方便在手机上确认是不是新版
+const VERSION = "情书 v11 · 自动更新"; // 每次更新改一下，方便在手机上确认是不是新版
 for (const id of ["verA", "verH"]) { const e = document.getElementById(id); if (e) e.textContent = VERSION; }
 const show = id => document.querySelectorAll(".screen").forEach(s => s.hidden = s.id !== id);
 function toast(text, kind = "") { const box = $("#toasts"); const t = el(`<div class="toast ${kind}"></div>`); t.textContent = text; box.prepend(t); while (box.children.length > 3) box.lastChild.remove(); setTimeout(() => t.remove(), 3800); }
@@ -15,10 +15,16 @@ function toast(text, kind = "") { const box = $("#toasts"); const t = el(`<div c
   await LOCAL.init();
   if (window.FIREBASE_CONFIG) { try { ONLINE = new QSNet.FireNet(window.FIREBASE_CONFIG); await ONLINE.init(); } catch (e) { console.error(e); ONLINE = null; } }
   if (ONLINE) ONLINE.onAuth(u => { if (G) return; if (u) openHome(); else openAuth(); }); else openAuth();
-  if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("./sw.js").catch(() => {});
+  if ("serviceWorker" in navigator && location.protocol === "https:") {
+    // 有新版本时：不在对局里就立刻刷新；在对局里就等回到首页再刷新。回到前台时也去检查一下有没有新版
+    const had = !!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register("./sw.js").then(reg => { document.addEventListener("visibilitychange", () => { if (!document.hidden) reg.update().catch(() => {}); }); }).catch(() => {});
+    navigator.serviceWorker.addEventListener("controllerchange", () => { if (!had) return; if (typeof G !== "undefined" && G) window.__needReload = true; else location.reload(); });
+  }
 })();
 let authMode = "in";
-function openAuth() { show("sAuth"); $("#authOnline").hidden = !ONLINE; $("#authOffline").hidden = !!ONLINE; }
+function openAuth() {
+  if (window.__needReload) return location.reload(); show("sAuth"); $("#authOnline").hidden = !ONLINE; $("#authOffline").hidden = !!ONLINE; }
 document.querySelectorAll("#authSeg button").forEach(b => b.onclick = () => { authMode = b.dataset.m; document.querySelectorAll("#authSeg button").forEach(x => x.setAttribute("aria-pressed", String(x === b))); $("#aName").hidden = authMode !== "up"; $("#aGo").textContent = authMode === "up" ? "注册并登录" : "登录"; $("#aErr").textContent = ""; });
 $("#aGo").onclick = async () => {
   const email = $("#aEmail").value.trim(), pw = $("#aPw").value, name = $("#aName").value.trim(); $("#aErr").textContent = "";
@@ -30,6 +36,7 @@ $("#aSolo").onclick = () => startSolo();
 
 /* ================= 首页 ================= */
 async function openHome() {
+  if (window.__needReload) return location.reload();
   show("sHome"); $("#hErr").textContent = "";
   const net = ONLINE || LOCAL;
   $("#hOut").hidden = !ONLINE; $("#hCreate").disabled = !ONLINE; $("#hJoin").disabled = !ONLINE;
