@@ -5,6 +5,8 @@ const $ = s => document.querySelector(s);
 const el = h => { const t = document.createElement("template"); t.innerHTML = h.trim(); return t.content.firstElementChild; };
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 let ONLINE = null, LOCAL = new QSNet.LocalNet(), NET = null, G = null;
+const VERSION = "情书 v9 · 亮牌动画"; // 每次更新改一下，方便在手机上确认是不是新版
+for (const id of ["verA", "verH"]) { const e = document.getElementById(id); if (e) e.textContent = VERSION; }
 const show = id => document.querySelectorAll(".screen").forEach(s => s.hidden = s.id !== id);
 function toast(text, kind = "") { const box = $("#toasts"); const t = el(`<div class="toast ${kind}"></div>`); t.textContent = text; box.prepend(t); while (box.children.length > 3) box.lastChild.remove(); setTimeout(() => t.remove(), 3800); }
 
