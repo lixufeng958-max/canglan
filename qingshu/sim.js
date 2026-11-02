@@ -111,6 +111,8 @@ Sim.prototype.apply = function (ev) {
   let t = a.target != null && ts.includes(a.target) ? a.target : null;
   if (C.tgt !== "none" && ts.length && t == null) return; // 有目标可选就必须选
   s.hand.splice(s.hand.indexOf(card), 1); s.disc.push(card);
+  // 别人记得 p 手里是这张牌，而 p 正好把它打掉了：剩下的是新摸的牌，变回未知
+  for (const q of this.order) if (q !== p && this.S[q].know[p] === card) delete this.S[q].know[p];
   this.L(`${this.name(p)}打出「${C.name}」${t != null ? "→ " + this.name(t) : ""}`, "all", "play");
   const wasOut = Object.fromEntries(this.order.map(q => [q, this.S[q].out])), F = { n: this.n, by: p, card, t, round: this.round };
   if (t == null && C.tgt !== "none") { this.L("没有可以选的目标，这张牌没有效果", "all"); }
@@ -132,7 +134,9 @@ Sim.prototype.apply = function (ev) {
       for (const q of this.order) delete this.S[q].know[p];
       return; // 这一回合还没结束，等 keep 事件
     }
-    case 7: { const mine = s.hand[0], theirs = this.S[t].hand[0]; s.hand = [theirs]; this.S[t].hand = [mine]; s.know[t] = mine; this.S[t].know[p] = theirs; F.secret = { [p]: theirs, [t]: mine }; F.note = "交换了手牌"; this.L(`${this.name(p)}和${this.name(t)}交换了手牌`, "all"); this.L(`你换到了「${CARDS[theirs].name}」`, [p], "secret"); this.L(`你换到了「${CARDS[mine].name}」`, [t], "secret"); break; }
+    case 7: { const mine = s.hand[0], theirs = this.S[t].hand[0]; s.hand = [theirs]; this.S[t].hand = [mine];
+      // 旁观者记得的牌跟着换手：原来知道 p 的现在知道 t，反之亦然
+      for (const q of this.order) { if (q === p || q === t) continue; const K = this.S[q].know, kp = K[p], kt = K[t]; delete K[p]; delete K[t]; if (kp != null) K[t] = kp; if (kt != null) K[p] = kt; } s.know[t] = mine; this.S[t].know[p] = theirs; F.secret = { [p]: theirs, [t]: mine }; F.note = "交换了手牌"; this.L(`${this.name(p)}和${this.name(t)}交换了手牌`, "all"); this.L(`你换到了「${CARDS[theirs].name}」`, [p], "secret"); this.L(`你换到了「${CARDS[mine].name}」`, [t], "secret"); break; }
     case 0: F.note = "埋下细作"; break;
     case 8: break;
     case 9: this.knock(p, "弃掉了公主"); break;
