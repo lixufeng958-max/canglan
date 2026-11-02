@@ -167,18 +167,23 @@ function botDecide(sim, pid, salt) {
   const left = v => sim.countOf(v) - (seen[v] || 0);
   const pick = (arr, k) => arr[Math.floor(rnd(k) * arr.length)];
   const other = v => hand.find(x => x !== v);
+  // 电脑故意不太聪明：四成时候随手出一张（只保证不打公主），记住的手牌也只有一半时候会用上
+  const careless = rnd(40) < .4, useMemory = rnd(41) < .5;
   // 决定打哪张：绝不打公主；皇后能留就留；小牌优先打
   let card = hand.includes(9) ? hand.find(v => v !== 9) : hand.slice().sort((a, b) => a - b)[0];
-  if (hand.includes(8) && hand.some(v => v !== 8 && v <= 4)) card = hand.find(v => v !== 8 && v <= 4);
-  // 侯爷：只有自己另一张够大才比
-  if (card === 3 && other(3) != null && other(3) < 5 && other(3) !== 9) card = other(3);
-  // 国公：手里另一张很小时值得换换
-  if (hand.includes(6) && other(6) != null && other(6) <= 3 && sim.deck.length >= 2) card = 6;
+  if (careless) { const ok = hand.filter(v => v !== 9); card = ok.length ? pick(ok, 42) : card; }
+  else {
+    if (hand.includes(8) && hand.some(v => v !== 8 && v <= 4)) card = hand.find(v => v !== 8 && v <= 4);
+    // 侯爷：只有自己另一张够大才比
+    if (card === 3 && other(3) != null && other(3) < 5 && other(3) !== 9) card = other(3);
+    // 国公：手里另一张很小时值得换换
+    if (hand.includes(6) && other(6) != null && other(6) <= 3 && sim.deck.length >= 2) card = 6;
+  }
   const ts = sim.targets(pid, card);
   const a = { card };
   if (CARDS[card].tgt !== "none" && ts.length) {
-    const known = ts.filter(q => q !== pid && s.know[q] != null);
-    if (card === 1) { const kq = known.find(q => s.know[q] !== 1); if (kq) { a.target = kq; a.guess = s.know[kq]; } else { a.target = pick(ts, 1); const gs = sim.guessable(); let best = gs[0], bl = -1; for (const v of gs) if (left(v) > bl) { bl = left(v); best = v; } a.guess = rnd(2) < .35 ? pick(gs.filter(v => left(v) > 0), 3) || best : best; } }
+    const known = useMemory ? ts.filter(q => q !== pid && s.know[q] != null) : [];
+    if (card === 1) { const kq = known.find(q => s.know[q] !== 1); if (kq) { a.target = kq; a.guess = s.know[kq]; } else { a.target = pick(ts, 1); const gs = sim.guessable(); let best = gs[0], bl = -1; for (const v of gs) if (left(v) > bl) { bl = left(v); best = v; } a.guess = careless || rnd(2) < .6 ? pick(gs, 3) : best; } }
     else if (card === 3) { const kq = known.find(q => s.know[q] < other(3)); a.target = kq || pick(ts, 4); }
     else if (card === 5) { const kq = known.find(q => s.know[q] === 9); a.target = kq || (other(5) <= 3 && ts.includes(pid) && rnd(5) < .3 ? pid : pick(ts.filter(q => q !== pid).length ? ts.filter(q => q !== pid) : ts, 6)); }
     else if (card === 7) { const kq = known.find(q => s.know[q] > other(7)); a.target = kq || pick(ts, 7); }

@@ -5,7 +5,7 @@ const $ = s => document.querySelector(s);
 const el = h => { const t = document.createElement("template"); t.innerHTML = h.trim(); return t.content.firstElementChild; };
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 let ONLINE = null, LOCAL = new QSNet.LocalNet(), NET = null, G = null;
-const VERSION = "情书 v9 · 亮牌动画"; // 每次更新改一下，方便在手机上确认是不是新版
+const VERSION = "情书 v10 · 布局自适应"; // 每次更新改一下，方便在手机上确认是不是新版
 for (const id of ["verA", "verH"]) { const e = document.getElementById(id); if (e) e.textContent = VERSION; }
 const show = id => document.querySelectorAll(".screen").forEach(s => s.hidden = s.id !== id);
 function toast(text, kind = "") { const box = $("#toasts"); const t = el(`<div class="toast ${kind}"></div>`); t.textContent = text; box.prepend(t); while (box.children.length > 3) box.lastChild.remove(); setTimeout(() => t.remove(), 3800); }
@@ -180,10 +180,13 @@ async function playFx(f) {
   await sleep(480);
   // 2. 有目标：画箭头，目标震一下
   if (f.t != null) {
-    const to = posOf(f.t), sx = cx, sy = cy + (to.y > cy ? bh / 2 : -bh / 2);
-    const mx = (sx + to.x) / 2 + (to.y > cy ? 40 : -40), my = (sy + to.y) / 2;
-    const ang = Math.atan2(to.y - my, to.x - mx), hx = to.x - Math.cos(ang) * 22, hy = to.y - Math.sin(ang) * 22;
-    const svg = el(`<svg class="arrow"><path d="M${sx} ${sy} Q${mx} ${my} ${hx} ${hy}"/><polygon class="head" points="0,-9 18,0 0,9" transform="translate(${hx},${hy}) rotate(${ang * 180 / Math.PI})"/></svg>`);
+    const to = posOf(f.t), sx = from.x, sy = from.y;
+    // 从出牌人画到目标，弧线往远离中央大牌的方向弯，免得被牌挡住
+    const mx0 = (sx + to.x) / 2, my0 = (sy + to.y) / 2, dx = to.x - sx, dy = to.y - sy, len = Math.hypot(dx, dy) || 1;
+    let nx = -dy / len, ny = dx / len; if ((mx0 + nx - cx) ** 2 + (my0 + ny - cy) ** 2 < (mx0 - nx - cx) ** 2 + (my0 - ny - cy) ** 2) { nx = -nx; ny = -ny; }
+    const bend = Math.min(140, 40 + len * .25), mx = mx0 + nx * bend, my = my0 + ny * bend;
+    const ang = Math.atan2(to.y - my, to.x - mx), hx = to.x - Math.cos(ang) * 22, hy = to.y - Math.sin(ang) * 22, a0 = Math.atan2(my - sy, mx - sx), x0 = sx + Math.cos(a0) * 20, y0 = sy + Math.sin(a0) * 20;
+    const svg = el(`<svg class="arrow"><circle class="head" cx="${sx}" cy="${sy}" r="5"/><path d="M${x0} ${y0} Q${mx} ${my} ${hx} ${hy}"/><polygon class="head" points="0,-9 18,0 0,9" transform="translate(${hx},${hy}) rotate(${ang * 180 / Math.PI})"/></svg>`);
     layer.append(svg);
     const path = svg.querySelector("path"), L = path.getTotalLength(); path.style.strokeDasharray = L; path.style.strokeDashoffset = L;
     path.animate([{ strokeDashoffset: L }, { strokeDashoffset: 0 }], { duration: 380, easing: "ease-out", fill: "forwards" });
@@ -240,6 +243,7 @@ function render() {
     d.onclick = () => openPlayer(p);
     ops.append(d);
   });
+  requestAnimationFrame(fitCenter);
   // 场上弃牌汇总：每种牌打出几张 / 还剩几张
   const played = {}; for (const q of s.order) for (const v of S[q].disc) played[v] = (played[v] || 0) + 1; for (const v of s.faceUp) played[v] = (played[v] || 0) + 1;
   $("#pile").innerHTML = s.values.map(v => { const k = played[v] || 0; return `<span class="chip c${v} ${k ? "" : "left"}"><i>${v}</i>${CARDS[v].name}<em>${k}/${s.countOf(v)}</em></span>`; }).join("");
@@ -278,6 +282,25 @@ function render() {
   // 轮次结算（等动画播完）
   maybeShowRound();
 }
+/* 把桌子中央的牌库/暗牌/弃牌计数，缩放后放进座位之间最大的空位里，任何手机都不挡人 */
+function fitCenter() {
+  const tb = $("#table"), c = document.querySelector(".center"); if (!tb || !c) return;
+  const T = tb.getBoundingClientRect(); if (!T.width) return;
+  let r = { l: 6, t: 6, r: T.width - 6, b: T.height - 6 };
+  const area = q => Math.max(0, q.r - q.l) * Math.max(0, q.b - q.t);
+  const seats = [...document.querySelectorAll("#opps .seat")].map(e => { const b = e.getBoundingClientRect(); return { l: b.left - T.left - 4, t: b.top - T.top - 4, r: b.right - T.left + 4, b: b.bottom - T.top + 4 }; });
+  for (let pass = 0; pass < 3; pass++) for (const s of seats) {
+    if (s.r <= r.l || s.l >= r.r || s.b <= r.t || s.t >= r.b) continue; // 不重叠
+    const opts = [{ ...r, t: s.b }, { ...r, b: s.t }, { ...r, l: s.r }, { ...r, r: s.l }];
+    r = opts.reduce((a, b) => area(b) > area(a) ? b : a);
+  }
+  c.style.transform = "none";
+  const w = c.offsetWidth, h = c.offsetHeight, rw = r.r - r.l, rh = r.b - r.t;
+  const k = Math.max(.55, Math.min(1.15, rw / w, rh / h));
+  c.style.left = r.l + Math.max(0, (rw - w * k) / 2) + "px"; c.style.top = r.t + Math.max(0, (rh - h * k) / 2) + "px";
+  c.style.transform = `scale(${k})`; c.classList.add("fit");
+}
+addEventListener("resize", () => { if (G) fitCenter(); });
 /* 点某个玩家：看他这一轮弃过的全部牌 */
 function openPlayer(p) {
   const s = G.sim, t = s.S[p], P = s.P[p];
