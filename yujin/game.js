@@ -142,7 +142,7 @@ const los = (L, a, b) => { const d = hyp(b.x - a.x, b.y - a.y); return ray(L, a.
 
 /* ================= 敌人 ================= */
 function spawn(L, type, x, y, awake) {
-  const E = YJ.ENEMY[type], e = { type, E, x, y, r: E.r, hp: E.hp * L.hpM * (E.elite ? 1 : R(.85, 1.15)), ang: rnd() * TAU, awake, sp: E.sp * R(.9, 1.1), cd: 0, t: R(0, 1), losT: rnd() * .4, see: false, walk: rnd() * 9, flash: 0, slow: 0, burn: 0, kx: 0, ky: 0, cloth: pick(E.cloth), v: rnd(), st: "", w: 0, n: 0, sum: 6, stag: 0 };
+  const E = YJ.ENEMY[type], e = { type, E, x, y, r: E.r, hp: E.hp * L.hpM * (E.elite ? 1 : R(.85, 1.15)), ang: rnd() * TAU, awake, sp: E.sp * R(.9, 1.1), cd: 0, t: R(0, 1), losT: rnd() * .4, see: false, walk: rnd() * 9, flash: 0, slow: 0, burn: 0, kx: 0, ky: 0, cloth: pick(E.cloth), v: rnd(), st: "", w: 0, n: 0, sum: 6, stag: 0, atk: 0 };
   e.maxhp = e.hp; L.en.push(e); return e;
 }
 function wake(L, x, y, rad) { for (const e of L.en) if (!e.awake && (e.x - x) ** 2 + (e.y - y) ** 2 < rad * rad) { e.awake = true; if (rnd() < .25) SFX("groan", .5); } }
@@ -155,7 +155,7 @@ function horde(L, n, types) {
 function updEnemy(L, e, dt) {
   const pl = G.pl, E = e.E, dx = pl.x - e.x, dy = pl.y - e.y, d = hyp(dx, dy);
   if (e.hp <= 0) return kill(L, e);
-  e.flash -= dt; e.cd -= dt; e.walk += dt * (e.awake ? e.sp / 14 : 1.5);
+  e.flash -= dt; e.cd -= dt; e.atk -= dt; e.walk += dt * (e.awake ? e.sp / 14 : 1.5);
   if (e.burn > 0) { e.burn -= dt; e.hp -= e.burnD * dt; if (rnd() < dt * 8) part(L, e.x + R(-8, 8), e.y + R(-8, 8), R(-10, 10), R(-50, -20), .5, "#ff9a30", 3, 1); if (e.hp <= 0) return kill(L, e); }
   if (e.slow > 0) e.slow -= dt; if (e.stag > 0) e.stag -= dt;
   if (e.type === "crawler" && e.awake && rnd() < dt * 1.5) L.decals.push({ t: "blood", x: e.x - Math.cos(e.ang) * 8, y: e.y - Math.sin(e.ang) * 8, r: R(2, 4), c: "#3a0606" });
@@ -176,7 +176,7 @@ function updEnemy(L, e, dt) {
     if (d < e.r + pl.r + 4) { hurtPlayer(E.dmg * L.dmgM * 1.3, e); e.w = 0; }
     if (e.w <= 0 || e.hitW) { e.st = ""; e.cd = e.type === "crawler" ? 2.2 : .5; if (e.hitW) { G.shake = Math.max(G.shake, 6); for (let k = 0; k < 8; k++) part(L, e.x, e.y, R(-90, 90), R(-90, 90), .5, "#8a8a8a", 3); } } }
   else if (ai === "spit" && e.see && d < 330) { mv = false; e.ang = Math.atan2(dy, dx); // 站在远处不动，朝玩家脚下吐酸
-    if (e.cd <= 0) { e.cd = R(2.4, 3.2); const a = e.ang + R(-.08, .08), dd = Math.min(d, 330), v = 240, life = Math.max(.35, dd / v); L.bul.push({ x: e.x + Math.cos(a) * 14, y: e.y + Math.sin(a) * 14, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life, max: life, dmg: E.dmg * L.dmgM, enemy: 1, acid: 1 }); SFX("spit", .5); } }
+    if (e.cd <= 0) { e.cd = R(2.4, 3.2); e.atk = .32; const a = e.ang + R(-.08, .08), dd = Math.min(d, 330), v = 240, life = Math.max(.35, dd / v); L.bul.push({ x: e.x + Math.cos(a) * 14, y: e.y + Math.sin(a) * 14, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life, max: life, dmg: E.dmg * L.dmgM, enemy: 1, acid: 1 }); SFX("spit", .5); } }
   else if (ai === "leap" && e.see && d < 125 && e.cd <= 0 && e.stag <= 0) { tele(e, "leap", .28, Math.atan2(dy, dx)); }
   else if ((ai === "slam" || e.look === "brute") && e.see && d < 92 && e.cd <= 0 && e.st === "") { tele(e, "pound", .7, Math.atan2(dy, dx)); }
   else if (ai === "boom" && d < e.r + pl.r + 14) return kill(L, e);
@@ -189,13 +189,13 @@ function updEnemy(L, e, dt) {
       else tele(e, a, a === "slam" ? .95 : a === "charge" ? .6 : .5, Math.atan2(dy, dx)); }
   }
   if (mv && e.st === "") { e.ang = Math.atan2(ty, tx); move(L, e, tx * sp * dt, ty * sp * dt);
-    if (d < e.r + pl.r + 5 && e.cd <= 0 && ai !== "boom" && ai !== "slam") { e.cd = .85; hurtPlayer(E.dmg * L.dmgM, e); } }
+    if (d < e.r + pl.r + 5 && e.cd <= 0 && ai !== "boom" && ai !== "slam") { e.cd = .85; e.atk = .32; hurtPlayer(E.dmg * L.dmgM, e); } }
 }
 function tele(e, type, t, ang) { e.st = "wind"; e.w = t; e.tele = { type, t, ang }; }
 function doAttack(L, e) {
   const pl = G.pl, a = e.tele.type, p2 = e.hp < e.maxhp * .5; e.st = "";
-  if (a === "leap") { e.st = "dash"; e.w = .34; e.ang = e.tele.ang; SFX("groan", .5); }
-  else if (a === "pound") { const x = e.x + Math.cos(e.tele.ang) * 34, y = e.y + Math.sin(e.tele.ang) * 34; explode(L, x, y, 92, e.E.dmg * L.dmgM * 1.3, 2, "#8f8a80"); L.decals.push({ t: "crack", x, y, r: 44 }); e.cd = 1.7; }
+  if (a === "leap") { e.st = "dash"; e.w = .34; e.atk = .32; e.ang = e.tele.ang; SFX("groan", .5); }
+  else if (a === "pound") { e.atk = .16; const x = e.x + Math.cos(e.tele.ang) * 34, y = e.y + Math.sin(e.tele.ang) * 34; explode(L, x, y, 92, e.E.dmg * L.dmgM * 1.3, 2, "#8f8a80"); L.decals.push({ t: "crack", x, y, r: 44 }); e.cd = 1.7; }
   else if (a === "charge") { e.st = "dash"; e.w = e.type === "boss" ? 1.1 : .9; e.ang = e.tele.ang; SFX("roar", .6); }
   else if (a === "volley") { const base = Math.atan2(pl.y - e.y, pl.x - e.x), n = p2 ? 22 : 14;
     for (let k = 0; k < n; k++) { const an = p2 ? k / n * TAU + e.n : base + (k - (n - 1) / 2) * .16; L.bul.push({ x: e.x + Math.cos(an) * 30, y: e.y + Math.sin(an) * 30, vx: Math.cos(an) * 230, vy: Math.sin(an) * 230, life: 2.6, dmg: e.E.dmg * L.dmgM * .7, enemy: 1 }); } SFX("spit"); }
@@ -227,7 +227,7 @@ function kill(L, e) {
   blood(L, e.x, e.y, 12, rnd() * TAU);
   if (E.ai === "boom") { explode(L, e.x, e.y, 105, E.dmg * L.dmgM, 1, "#8fbf2a"); addPool(L, e.x, e.y, 46, 5, E.dmg * L.dmgM * .3); // 炸开：酸液、碎肉，波及周围丧尸
     for (let k = 0; k < 9; k++) { const a = rnd() * TAU, v = R(80, 300); part(L, e.x, e.y, Math.cos(a) * v, Math.sin(a) * v, R(.4, .8), pick(["#6a1a14", "#5a7a1a", "#7a2a20"]), R(4, 8), 0, "bl"); L.decals.push({ t: "gib", x: e.x + Math.cos(a) * R(20, 90), y: e.y + Math.sin(a) * R(20, 90), r: R(3, 7), ang: a }); } }
-  else { const fa = Math.atan2(e.ky, e.kx); L.bodies.push({ type: e.type, x: e.x, y: e.y, r: e.r, ang: (e.kx || e.ky) ? fa : e.ang + Math.PI, c: e.cloth, skin: E.skin, t: 0, dur: e.type === "runner" ? 1.5 : e.type === "brute" ? .55 : .3, v: e.v });
+  else { const fa = Math.atan2(e.ky, e.kx); L.bodies.push({ type: e.type, x: e.x, y: e.y, r: e.r, ang: (e.kx || e.ky) ? fa : e.ang + Math.PI, c: e.cloth, skin: E.skin, t: 0, dur: e.type === "runner" ? 1.6 : .5, v: e.v, face: e.ang, key: e.type === "boss" ? null : e.type === "elite" ? (e.look === "brute" ? "elite2" : "elite") : e.type, sv: e.type === "walker" ? (e.v * 3) | 0 : 0 });
     if (e.type === "crawler") L.decals.push({ t: "smear", x: e.x, y: e.y, ang: e.ang, r: 46 });
     if (e.type === "brute") { G.shake = Math.max(G.shake, 12); SFX("boom", .5); for (const o of L.en) if (o !== e && !o.dead && !o.E.elite && o.r < 20 && hyp(o.x - e.x, o.y - e.y) < 62) { o.hp = 0; blood(L, o.x, o.y, 8, rnd() * TAU); } } }
   if (E.ai !== "boom" && S.legs.boom) explode(L, e.x, e.y, 70, S.wdmg * S.dmgM * 1.2, 0);
