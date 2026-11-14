@@ -1,5 +1,5 @@
 /* 余烬·尸潮 — 数据：武器、装备词条、天赋、敌人、关卡、剧情 */
-window.YJ = { TILE: 40, VERSION: "余烬 v1" };
+window.YJ = { TILE: 40, VERSION: "余烬 v2 · 暗黑基地" };
 
 YJ.RAR = [{ n: "普通", c: "#B9B9B9" }, { n: "精良", c: "#4FA3FF" }, { n: "稀有", c: "#FFD23F" }, { n: "传说", c: "#FF7A2F" }];
 YJ.SLOTS = { weapon: "武器", armor: "护甲", boots: "靴子", charm: "饰品" };
@@ -66,44 +66,45 @@ YJ.TALENTS = [
 
 /* 敌人 */
 YJ.ENEMY = {
-  walker:  { name: "行尸", hp: 42, sp: 58, dmg: 10, r: 13, xp: 6, skin: "#7d8f6a", cloth: ["#4a5560", "#5a4a40", "#3f4d3a", "#56506a"] },
-  runner:  { name: "疾行者", hp: 26, sp: 150, dmg: 8, r: 11, xp: 8, skin: "#9aa07a", cloth: ["#6a3a34", "#3a4a5a"] },
-  spitter: { name: "喷吐者", hp: 36, sp: 52, dmg: 13, r: 13, xp: 11, skin: "#6fa05a", cloth: ["#40503a"], ai: "spit" },
-  bloater: { name: "脓爆者", hp: 64, sp: 66, dmg: 30, r: 17, xp: 13, skin: "#b0a45a", cloth: ["#5a5030"], ai: "boom" },
-  brute:   { name: "巨尸", hp: 340, sp: 62, dmg: 26, r: 23, xp: 45, skin: "#6d7a66", cloth: ["#33383a"], ai: "charge" },
-  elite:   { name: "护士长", hp: 1500, sp: 70, dmg: 28, r: 25, xp: 220, skin: "#9db0a0", cloth: ["#c8d6d0"], ai: "charge", elite: 1, summon: 1 },
-  boss:    { name: "零号", hp: 6800, sp: 78, dmg: 30, r: 36, xp: 800, skin: "#7a6a8a", cloth: ["#e8e8ee"], ai: "boss", elite: 1 }
+  walker:  { name: "行尸", hp: 44, sp: 50, dmg: 10, r: 13, xp: 6, skin: "#6c7b68", cloth: ["#4a5258", "#544a42", "#3f4a3c", "#4d4a5c", "#5a5248"] },
+  runner:  { name: "疯跑者", hp: 24, sp: 158, dmg: 8, r: 10, xp: 8, skin: "#98987f", cloth: ["#5a3530", "#34424e", "#3d3d36"] },
+  crawler: { name: "爬行者", hp: 30, sp: 46, dmg: 14, r: 10, xp: 8, skin: "#5f6b5c", cloth: ["#30363a", "#3a322c"], ai: "leap" },
+  spitter: { name: "喷吐者", hp: 40, sp: 40, dmg: 13, r: 13, xp: 11, skin: "#a3aa4c", cloth: ["#4a5230"], ai: "spit" },
+  bloater: { name: "肥尸", hp: 150, sp: 38, dmg: 30, r: 24, xp: 16, skin: "#7f9a48", cloth: ["#4c4a34"], ai: "boom" },
+  brute:   { name: "巨尸", hp: 420, sp: 56, dmg: 28, r: 27, xp: 50, skin: "#6a7566", cloth: ["#2b3036", "#343a2c"], ai: "slam" },
+  elite:   { name: "护士长", hp: 1500, sp: 70, dmg: 28, r: 25, xp: 220, skin: "#9aa89c", cloth: ["#b9c4be"], ai: "charge", elite: 1, summon: 1 },
+  boss:    { name: "零号", hp: 6800, sp: 78, dmg: 30, r: 36, xp: 800, skin: "#75687f", cloth: ["#c9c9cf"], ai: "boss", elite: 1 }
 };
 
 /* 关卡主题：地面/墙面颜色、黑暗程度、环境 */
 YJ.THEMES = {
-  street:   { floor: "#2c2e33", floor2: "#33363c", wall: "#5b4037", top: "#74554a", dark: .80, tint: "rgba(60,90,140,.10)", lamp: "#ffd9a0", rain: 1, prop: "barrier" },
-  subway:   { floor: "#25282b", floor2: "#2d3135", wall: "#3b434a", top: "#4f5a63", dark: .90, tint: "rgba(40,70,60,.10)", lamp: "#ffb060", prop: "crate" },
-  hospital: { floor: "#3d4a47", floor2: "#465551", wall: "#7f958d", top: "#a9bdb5", dark: .84, tint: "rgba(60,120,100,.08)", lamp: "#d8fff0", flicker: 1, prop: "bed" },
-  base:     { floor: "#32382f", floor2: "#3a4136", wall: "#4b5441", top: "#646f57", dark: .82, tint: "rgba(120,90,40,.08)", lamp: "#ffcf80", prop: "crate" },
-  lab:      { floor: "#1e2932", floor2: "#25333e", wall: "#2f4250", top: "#45607a", dark: .74, tint: "rgba(40,160,200,.08)", lamp: "#7fe8ff", prop: "tank" }
+  street:   { floor: "#2b2f2d", floor2: "#313633", wall: "#3c423e", top: "#262a28", dark: .93, tint: "rgba(30,60,45,.10)", lamp: "#ffd9a0", acc: "#b8962a", pipe: "#4d5a50", rain: 1, prop: "barrier" },
+  subway:   { floor: "#26292a", floor2: "#2c3031", wall: "#353b3d", top: "#1f2324", dark: .95, tint: "rgba(30,55,45,.10)", lamp: "#ffb060", acc: "#b8662a", pipe: "#5a4a3a", prop: "crate" },
+  hospital: { floor: "#2f3a36", floor2: "#35413c", wall: "#46544d", top: "#28322e", dark: .94, tint: "rgba(40,90,70,.10)", lamp: "#c8ffe8", acc: "#8a2a22", pipe: "#5d6e64", flicker: 1, prop: "bed" },
+  base:     { floor: "#2c322a", floor2: "#32392f", wall: "#3f4838", top: "#242a20", dark: .94, tint: "rgba(50,70,30,.10)", lamp: "#ffcf80", acc: "#b8962a", pipe: "#56603f", prop: "crate" },
+  lab:      { floor: "#232d30", floor2: "#293437", wall: "#324045", top: "#1c2528", dark: .92, tint: "rgba(30,90,90,.10)", lamp: "#7fe8ff", acc: "#2a8a8a", pipe: "#48626a", prop: "tank" }
 };
 
 /* 五个关卡。obj：exit 直达出口 / collect 收集 n 个 / elite 击杀精英 / activate 启动 n 台 / boss */
 YJ.LEVELS = [
   { name: "第一章 · 灰烬街区", theme: "street", size: 64, rooms: 12, rw: [8, 12], rh: [7, 10], cw: 3, dens: .085, lvl: 1,
-    mix: { walker: 10, runner: 2 }, horde: [32, 6], obj: { t: "exit" }, goal: "穿过老城区，找到地铁入口", exitName: "地铁入口",
+    mix: { walker: 10, runner: 2, crawler: 2 }, horde: [32, 6], obj: { t: "exit" }, goal: "穿过老城区，找到地铁入口", exitName: "地铁入口",
     radio: { start: [["林夏", "老城区信号很差，长话短说：一路向东南，地铁口有绿色应急灯。"], ["陈默", "明白。街上动静不小。"]],
       mid: [["林夏", "小心，热成像显示有一群正朝你那边聚过来！"]], done: [["陈默", "看到地铁口了。"]] } },
   { name: "第二章 · 沉寂地铁", theme: "subway", size: 68, rooms: 15, rw: [6, 10], rh: [5, 8], cw: 2, dens: .1, lvl: 3,
-    mix: { walker: 8, runner: 5, spitter: 3 }, horde: [30, 7], obj: { t: "collect", n: 3, name: "保险丝" }, goal: "找到 3 个保险丝，给闸门通电", exitName: "站台闸门",
+    mix: { walker: 8, runner: 4, crawler: 4, spitter: 3 }, horde: [30, 7], obj: { t: "collect", n: 3, name: "保险丝" }, goal: "找到 3 个保险丝，给闸门通电", exitName: "站台闸门",
     radio: { start: [["林夏", "地铁断电了，闸门打不开。配电间的保险丝应该散落在各个站厅。"], ["陈默", "三个保险丝。交给我。"]],
       mid: [["陈默", "墙上有字……『军方封了出口，他们没打算让任何人出去』。"], ["林夏", "……先别想这些。继续找。"]], done: [["林夏", "电来了！闸门在最里面，快走！"]] } },
   { name: "第三章 · 临江医院", theme: "hospital", size: 70, rooms: 16, rw: [6, 10], rh: [5, 9], cw: 2, dens: .105, lvl: 5,
-    mix: { walker: 7, runner: 5, spitter: 4, bloater: 3 }, horde: [28, 8], obj: { t: "elite", name: "门禁卡" }, goal: "击杀「护士长」，取得周博士的门禁卡", exitName: "天台通道",
+    mix: { walker: 8, runner: 5, crawler: 4, spitter: 3, bloater: 2 }, horde: [28, 8], obj: { t: "elite", name: "门禁卡" }, goal: "击杀「护士长」，取得周博士的门禁卡", exitName: "天台通道",
     radio: { start: [["林夏", "周博士的门禁卡在住院部。但那里有个……大家伙，幸存者叫它『护士长』。"], ["陈默", "听着就不好惹。"]],
       mid: [["陈默", "找到周博士的笔记：『零号样本外泄并非事故』……"], ["林夏", "什么意思？灰潮是……人为的？"]], done: [["陈默", "门禁卡到手。上面还沾着血。"]] } },
   { name: "第四章 · 铁幕基地", theme: "base", size: 72, rooms: 16, rw: [7, 11], rh: [6, 9], cw: 3, dens: .105, lvl: 7,
-    mix: { walker: 6, runner: 6, spitter: 4, bloater: 3, brute: 1 }, horde: [26, 9], obj: { t: "activate", n: 3, name: "发电机" }, goal: "启动 3 台发电机，为方舟电梯供电", exitName: "方舟电梯",
+    mix: { walker: 8, runner: 6, crawler: 4, spitter: 3, bloater: 2, brute: 1 }, horde: [26, 9], obj: { t: "activate", n: 3, name: "发电机" }, goal: "启动 3 台发电机，为方舟电梯供电", exitName: "方舟电梯",
     radio: { start: [["林夏", "方舟的入口在军事基地地下。电梯需要三台发电机同时供电。"], ["林夏", "发电机一响，方圆一公里的东西都会过来。"], ["陈默", "那就让它们来。"]],
       mid: [["林夏", "还差一台！撑住！"]], done: [["林夏", "电梯通电了！陈默……不管下面有什么，活着回来。"]] } },
   { name: "终章 · 方舟 B3", theme: "lab", size: 50, rooms: 5, rw: [6, 9], rh: [6, 8], cw: 3, dens: .05, lvl: 9, arena: 1,
-    mix: { walker: 5, runner: 5, spitter: 3, bloater: 2 }, horde: [0, 0], obj: { t: "boss" }, goal: "击败「零号」，带走血清", exitName: "血清保险库",
+    mix: { walker: 5, runner: 5, crawler: 3, spitter: 2, bloater: 1 }, horde: [0, 0], obj: { t: "boss" }, goal: "击败「零号」，带走血清", exitName: "血清保险库",
     radio: { start: [["周博士", "欢迎来到方舟，陈先生。你妹妹常提起你。"], ["陈默", "周博士？小雨在哪！"], ["周博士", "她是最完美的培养源……而我，是进化的终点。"]],
       mid: [["零号", "感受到了吗……这才是人类的未来！"]], done: [["陈默", "结束了。"]] } }
 ];

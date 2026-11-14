@@ -59,27 +59,52 @@ const PAINT = {
     c.fillStyle = "#07080a"; c.fillRect(W * .42, H * .6, W * .2, H * .12); c.fillRect(W * .48, H * .56, W * .08, H * .05); c.fillRect(W * .55, H * .575, W * .14, H * .012);
   }
 };
+/* 漫画分镜：每句话是一格静态画面，点一下"切"出下一格；一页三格，满了翻页 */
 let cut = null;
 UI.cutscene = function (key, done) {
   const sc = YJ.SCENES[key]; if (!sc) return done();
-  show("sCut"); G.state = "cut"; cut = { sc, i: 0, li: 0, ch: 0, t0: performance.now(), done, st: performance.now() };
+  show("sCut"); G.state = "cut"; const cells = []; sc.forEach((s, si) => s.lines.forEach((l, li) => cells.push({ bg: s.bg, who: l[0], txt: l[1], si, li })));
+  cut = { cells, n: 1, done, pop: performance.now(), cache: new Map(), page: 0 };
   try { YJ.Audio.mood("cut"); } catch {}
-  cutLine();
 };
-function cutLine() { const s = cut.sc[cut.i], l = s.lines[cut.li]; cut.ch = 0; cut.full = l[1]; $("#cutWho").textContent = l[0]; $("#cutWho").style.color = YJ.FACE[l[0]] || "#c9bfa8"; $("#cutWho").hidden = !l[0]; $("#cutTxt").textContent = ""; $("#cutTxt").className = l[0] ? "" : "narr"; }
-function cutNext() { if (!cut) return; SFX("ui", .4);
-  if (cut.ch < cut.full.length) { cut.ch = cut.full.length; $("#cutTxt").textContent = cut.full; return; }
-  const s = cut.sc[cut.i]; if (++cut.li < s.lines.length) return cutLine();
-  cut.li = 0; if (++cut.i < cut.sc.length) { cut.st = performance.now(); return cutLine(); }
-  const d = cut.done; cut = null; d(); }
-$("#sCut").addEventListener("click", e => { if (e.target.id === "cutSkip") { const d = cut.done; cut = null; d(); } else cutNext(); });
+function cutNext() { if (!cut) return;
+  if (cut.n >= cut.cells.length) { const d = cut.done; cut = null; return d(); }
+  cut.n++; cut.pop = performance.now(); SFX("cut", .7); const pg = Math.floor((cut.n - 1) / 3); if (pg !== cut.page) { cut.page = pg; cut.cache.clear(); } }
+$("#sCut").addEventListener("click", e => { if (!cut) return; if (e.target.id === "cutSkip") { const d = cut.done; cut = null; d(); } else cutNext(); });
+const CROPS = [[1, .5, .5], [1.7, .3, .62], [1.35, .68, .45], [2.1, .5, .7], [1.5, .25, .4], [1.2, .6, .6]];
+function cutPanel(cell, idx, w, h) {
+  const key = idx + ":" + w + "x" + h; let cv = cut.cache.get(key); if (cv) return cv;
+  cv = document.createElement("canvas"); cv.width = w; cv.height = h; const c = cv.getContext("2d"), [z, fx, fy] = CROPS[(cell.si * 2 + cell.li) % CROPS.length];
+  c.save(); c.translate(w / 2, h / 2); c.scale(z, z); c.translate(-w * fx, -h * fy); PAINT[cell.bg](c, w, h, cell.si * 7.3 + cell.li * 2.1 + 3); c.restore();
+  // 漫画质感：网点、压暗四角、粗描边留给外面
+  c.fillStyle = "rgba(0,0,0,.16)"; for (let y = 0; y < h; y += 5) for (let x = (y / 5 % 2) * 2.5; x < w; x += 5) c.fillRect(x, y, 1.6, 1.6);
+  const g = c.createRadialGradient(w / 2, h / 2, Math.min(w, h) * .3, w / 2, h / 2, Math.max(w, h) * .75); g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, "rgba(0,0,0,.6)"); c.fillStyle = g; c.fillRect(0, 0, w, h);
+  cut.cache.set(key, cv); return cv;
+}
+function wrapText(c, txt, maxW) { const out = []; let line = ""; for (const ch of txt) { if (c.measureText(line + ch).width > maxW && line) { out.push(line); line = ch; } else line += ch; } if (line) out.push(line); return out; }
 function cutFrame(now) {
-  const cv = $("#cutCv"), r = cv.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1); if (cv.width !== Math.round(r.width * dpr)) { cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr); }
-  const c = cv.getContext("2d"), W = r.width, H = r.height, t = (now - cut.t0) / 1000, bar = H * .12; c.setTransform(dpr, 0, 0, dpr, 0, 0);
-  c.save(); const z = 1.06 + Math.sin(t * .1) * .03; c.translate(W / 2, H / 2); c.scale(z, z); c.translate(-W / 2 + Math.sin(t * .13) * 8, -H / 2); PAINT[cut.sc[cut.i].bg](c, W, H, t); c.restore();
-  const fade = Math.min(1, (now - cut.st) / 700); if (fade < 1) { c.fillStyle = `rgba(0,0,0,${1 - fade})`; c.fillRect(0, 0, W, H); }
-  c.fillStyle = "#000"; c.fillRect(0, 0, W, bar); c.fillRect(0, H - bar * 2.1, W, bar * 2.1);
-  if (cut.ch < cut.full.length) { cut.ch = Math.min(cut.full.length, cut.ch + .55); $("#cutTxt").textContent = cut.full.slice(0, Math.floor(cut.ch)); if (Math.floor(cut.ch) % 3 === 0) SFX("type", .15); }
+  const cv = $("#cutCv"), r = cv.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1); if (cv.width !== Math.round(r.width * dpr)) { cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr); cut.cache.clear(); }
+  const c = cv.getContext("2d"), W = r.width, H = r.height, port = H > W; c.setTransform(dpr, 0, 0, dpr, 0, 0); c.fillStyle = "#050505"; c.fillRect(0, 0, W, H);
+  const mx = 10, top = 52, bot = 34, gap = 8, L = port ? H - top - bot : W - mx * 2 - 40, fr = [.36, .3, .34], sk = port ? W * .035 : H * .05;
+  const first = cut.page * 3, fs = Math.max(14, Math.min(19, Math.min(W, H) / 24));
+  let pos = 0;
+  for (let k = 0; k < 3; k++) { const len = L * fr[k], idx = first + k, cell = cut.cells[idx], p0 = pos; pos += len; if (!cell || idx >= cut.n) continue;
+    // 每格是带斜边的四边形
+    const s0 = k === 0 ? 0 : (k % 2 ? sk : -sk), s1 = k === 2 ? 0 : (k % 2 ? -sk : sk); let poly, bx, by, bw, bh;
+    if (port) { const y0 = top + p0 + (k ? gap / 2 : 0), y1 = top + p0 + len - (k < 2 ? gap / 2 : 0); poly = [[mx, y0 - s0 / 2], [W - mx, y0 + s0 / 2], [W - mx, y1 + s1 / 2], [mx, y1 - s1 / 2]]; }
+    else { const x0 = mx + 20 + p0 + (k ? gap / 2 : 0), x1 = mx + 20 + p0 + len - (k < 2 ? gap / 2 : 0); poly = [[x0 - s0 / 2, top], [x1 - s1 / 2, top], [x1 + s1 / 2, H - bot], [x0 + s0 / 2, H - bot]]; }
+    bx = Math.min(...poly.map(p => p[0])); by = Math.min(...poly.map(p => p[1])); bw = Math.max(...poly.map(p => p[0])) - bx; bh = Math.max(...poly.map(p => p[1])) - by;
+    const img = cutPanel(cell, idx, Math.round(bw), Math.round(bh)), age = idx === cut.n - 1 ? (now - cut.pop) / 170 : 9, pop = age < 1 ? 1 + (1 - age) * .12 : 1;
+    c.save(); c.translate(bx + bw / 2, by + bh / 2); c.scale(pop, pop); c.translate(-bx - bw / 2, -by - bh / 2);
+    c.beginPath(); poly.forEach((p, i) => i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1])); c.closePath(); c.save(); c.clip(); c.drawImage(img, bx, by, bw, bh);
+    if (age < 1) { c.fillStyle = `rgba(255,255,255,${(1 - age) * .8})`; c.fillRect(bx, by, bw, bh); }
+    // 文字：旁白是左上角的黄底方框，对白是底部的白色对话框 + 名字牌
+    c.font = `700 ${fs}px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif`; c.textBaseline = "top"; const pad = 9, tw0 = Math.min(bw - 36, port ? bw - 36 : 300), lines = wrapText(c, cell.txt, tw0 - pad * 2), tw = Math.min(tw0, Math.max(...lines.map(l => c.measureText(l).width)) + pad * 2 + 2), lh = fs * 1.45, th = lines.length * lh + pad * 2 - 4, tx = bx + 16 + (port ? 0 : 6), ty = cell.who ? by + bh - th - 16 - sk / 2 : by + 14 + sk / 2;
+    c.fillStyle = "#0a0a0a"; c.fillRect(tx + 3, ty + 3, tw, th); c.fillStyle = cell.who ? "#f4f1e8" : "#e8d89a"; c.fillRect(tx, ty, tw, th); c.strokeStyle = "#0a0a0a"; c.lineWidth = 2.5; c.strokeRect(tx, ty, tw, th);
+    c.fillStyle = "#111"; lines.forEach((l, i) => c.fillText(l, tx + pad, ty + pad + i * lh));
+    if (cell.who) { c.font = `800 ${fs - 2}px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif`; const nw = c.measureText(cell.who).width + 16; c.fillStyle = "#0a0a0a"; c.fillRect(tx + 8, ty - fs - 3, nw, fs + 6); c.fillStyle = YJ.FACE[cell.who] || "#e8d89a"; c.fillText(cell.who, tx + 16, ty - fs); }
+    c.restore(); c.strokeStyle = "#ece6d6"; c.lineWidth = 3.5; c.lineJoin = "miter"; c.stroke(); c.restore(); }
+  $("#cutTip").textContent = cut.n >= cut.cells.length ? "点屏幕结束" : "点屏幕看下一格";
 }
 
 /* ================= 标题 ================= */
@@ -151,7 +176,7 @@ UI.dead = function () {
 };
 UI.win = function () {
   const L = G.L, P = G.P; P.chapter++; P.med = Math.min(4, P.med + 1); let gift = null; if (P.inv.length < 30) { gift = YJ.makeItem(L.lvl + 2, { rar: Math.random() < .3 ? 2 : 1 }); P.inv.push(gift); } YJ.save();
-  const sh = UI.sheet("章节完成", `<div class="big good">${esc(L.def.name)}</div><div class="stats">${`<div><span>击杀</span><b>${L.kills}</b></div><div><span>用时</span><b>${fmtT(L.time)}</b></div><div><span>拾取装备</span><b>${L.loot}</b></div><div><span>等级</span><b>${P.lv}</b></div>`}</div><p class="tip" style="text-align:center">补给：医疗包 +1${gift ? `　<b style="color:${YJ.RAR[gift.rar].c}">${esc(YJ.itemName(gift))}</b>` : ""}</p><button class="btn block" id="wGo">继续</button>`, { noClose: 1 });
+  const sh = UI.sheet("章节完成", `<div class="big good">${esc(L.def.name)}</div><div class="stats">${`<div><span>得分</span><b>${L.score}</b></div><div><span>击杀</span><b>${L.kills}</b></div><div><span>用时</span><b>${fmtT(L.time)}</b></div><div><span>拾取装备</span><b>${L.loot}</b></div><div><span>等级</span><b>${P.lv}</b></div>`}</div><p class="tip" style="text-align:center">补给：医疗包 +1${gift ? `　<b style="color:${YJ.RAR[gift.rar].c}">${esc(YJ.itemName(gift))}</b>` : ""}</p><button class="btn block" id="wGo">继续</button>`, { noClose: 1 });
   sh.body.querySelector("#wGo").onclick = () => { sh.root.remove(); G.L = null; if (P.chapter >= YJ.LEVELS.length) UI.cutscene("ending", () => UI.cleared()); else UI.cutscene("pre" + P.chapter, () => UI.safe()); };
 };
 UI.cleared = function () {
@@ -170,7 +195,7 @@ let mmT = 0;
 function hud(dt) {
   const L = G.L, pl = G.pl, P = G.P, S = G.S; if (!L || !pl) return;
   $("#hpF").style.width = Math.max(0, pl.hp / S.maxhp * 100) + "%"; $("#hpT").textContent = Math.ceil(pl.hp) + " / " + S.maxhp; $("#xpF").style.width = P.xp / YJ.xpNeed(P.lv) * 100 + "%"; $("#hLv").textContent = "Lv." + P.lv;
-  $("#hW").textContent = YJ.itemName(P.eq.weapon); $("#hA").textContent = pl.rel > 0 ? "换弹中…" : pl.mag + " / " + S.mag; $("#bMed").dataset.n = P.med; $("#bMed").classList.toggle("off", !P.med);
+  $("#hSc").textContent = "SCORE " + String(L.score).padStart(6, "0"); $("#hpF").parentNode.classList.toggle("low", pl.hp < S.maxhp * .3); $("#hW").textContent = YJ.itemName(P.eq.weapon); $("#hA").textContent = pl.rel > 0 ? "换弹中…" : pl.mag + " / " + S.mag; $("#bMed").dataset.n = P.med; $("#bMed").classList.toggle("off", !P.med);
   const cd = (id, v, max) => { const e = $(id); e.style.setProperty("--cd", Math.max(0, v / max)); e.classList.toggle("off", v > 0); }; cd("#bDash", pl.dashCd, S.dashCd); cd("#bGren", pl.gCd, 6);
   const o = L.def.obj; $("#hObj").textContent = L.holdOn ? "守住「" + L.def.exitName + "」！开门中 " + Math.min(99, Math.floor(L.holdP / (10 + L.i * 2) * 100)) + "%（别走远）" : L.objDone ? "前往「" + L.def.exitName + "」（小地图上的绿点）" : L.def.goal + (o.n ? "　" + L.objN + "/" + o.n : ""); $("#hObj").classList.toggle("done", L.objDone);
   const bs = L.bossE && !L.bossE.dead && L.bossE.awake ? L.bossE : L.eliteE && !L.eliteE.dead && L.eliteE.awake ? L.eliteE : null; $("#boss").hidden = !bs; if (bs) { $("#bossF").style.width = bs.hp / bs.maxhp * 100 + "%"; $("#bossN").textContent = bs.E.name; }

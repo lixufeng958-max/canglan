@@ -107,6 +107,35 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;touch-
 .toast.gold{color:#FFD23F}.toast.blue{color:#4FA3FF}.toast.orange{color:#FF7A2F;font-weight:700}.toast.red{color:#ff7a6a}.toast.lv{color:#e8c23a;font-weight:700}
 @media (max-width:480px){#hObj{top:calc(112px + var(--st));left:calc(10px + var(--sl));transform:none;max-width:60vw}#toasts{top:calc(150px + var(--st))}#boss{top:calc(60px + var(--st));width:44vw;left:calc(10px + var(--sl));transform:none}#mm{width:78px;height:78px}}
 @media (max-height:480px){#radio{bottom:auto;top:calc(50px + var(--st));width:min(52vw,520px);font-size:12px}}
+/* —— 军用 HUD：暗底、荧光绿/琥珀字、切角边框 —— */
+#cutBox{display:none}#sCut{background:#050505}
+#hud{font-family:"SF Mono","Menlo","Consolas","Courier New","PingFang SC","Microsoft YaHei",monospace;--g:#39d98a;--a:#e8b82a}
+#hud .tl{width:min(46vw,240px)}
+#hud .tl::before{content:"HP";position:absolute;left:0;top:-1px;font-size:10px;font-weight:800;color:var(--g);letter-spacing:1px;line-height:16px}
+#hud .tl .bar:first-child{margin-left:22px;height:14px;border-radius:0;border:1px solid var(--g);background:rgba(2,10,6,.75);box-shadow:none;clip-path:polygon(0 0,100% 0,100% 60%,calc(100% - 6px) 100%,0 100%)}
+#hud .tl .bar:first-child>i{background:var(--g);-webkit-mask:repeating-linear-gradient(90deg,#000 0 6px,transparent 6px 8px);mask:repeating-linear-gradient(90deg,#000 0 6px,transparent 6px 8px);opacity:.85}
+#hud .tl .bar.low{border-color:#ff4030}#hud .tl .bar.low>i{background:#ff4030;animation:bl .5s infinite}
+#hud .tl .bar>span{font-size:10px;line-height:12px;font-weight:700;color:#eafff2;text-shadow:0 0 3px #000,0 1px 1px #000}
+#hud .bar.xp{margin-left:22px;height:3px;border-radius:0;border:0;box-shadow:none;background:rgba(232,184,42,.18)}#hud .bar.xp>i{background:var(--a)}
+#hLv{display:inline-block;color:var(--a);font-size:11px;margin:3px 10px 0 22px;letter-spacing:1px}
+#hSc{display:inline-block;color:var(--g);font-size:11px;font-weight:700;letter-spacing:1.5px;text-shadow:0 0 6px rgba(57,217,138,.5),0 1px 2px #000}
+#hObj{background:rgba(2,10,6,.78);border:1px solid rgba(57,217,138,.35);border-left:3px solid var(--a);border-radius:0;color:#d6f5e3;font-size:12px;letter-spacing:.5px}
+#hObj::before{content:"▶ 任务　";color:var(--a);font-weight:800}
+#hObj.done{border-left-color:var(--g);color:#aef5c9}
+#mm{border:1px solid var(--g);border-radius:0;background:rgba(2,10,6,.8);box-shadow:0 0 0 2px rgba(0,0,0,.6),0 0 10px rgba(57,217,138,.2)}
+.hb{border-radius:0;border:1px solid var(--g);background:rgba(2,10,6,.78);color:var(--g);font-size:15px;font-weight:800;clip-path:polygon(6px 0,100% 0,100% calc(100% - 6px),calc(100% - 6px) 100%,0 100%,0 6px)}
+.hb.pts{border-color:var(--a);color:var(--a);box-shadow:none}
+#bossN{color:#ff5a4a;font-size:12px;letter-spacing:5px}#boss .bar{border-radius:0;border:1px solid #ff4030;background:rgba(20,2,2,.7);box-shadow:none}#boss .bar>i{background:#c8281c}
+#wpn{border-left:3px solid var(--a);padding-left:8px;background:linear-gradient(90deg,rgba(2,10,6,.7),transparent)}
+#hW{color:#9fd8b8;font-size:11px;letter-spacing:1px}#hA{color:var(--a);font-size:26px;letter-spacing:2px;text-shadow:0 0 8px rgba(232,184,42,.45),0 1px 2px #000}
+.ab{border-radius:0;background:rgba(2,10,6,.62);border:1.5px solid rgba(57,217,138,.75);color:var(--g);font-weight:800;clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px)}
+.ab::after{background:rgba(0,0,0,.75)}.ab small{color:#9fd8b8;font-size:9px}.ab[data-n]::before{color:var(--a);right:6px}
+#radio{background:rgba(2,10,6,.88);border:1px solid rgba(57,217,138,.4);border-left:3px solid var(--g);border-radius:0;color:#d6f5e3}
+#rdW::before{content:"◤ 通讯 · "}
+.toast{background:rgba(2,10,6,.75);border-left:2px solid var(--g);border-radius:0;color:#cfe8d8}
+.toast.red{border-left-color:#ff4030}.toast.gold{border-left-color:var(--a)}
+.stk{border-color:rgba(57,217,138,.3)}.stk i{background:rgba(57,217,138,.3)}
+@media (max-width:480px){#hObj{top:calc(96px + var(--st))}#toasts{top:calc(168px + var(--st))}#radio{bottom:calc(168px + var(--sb));width:calc(100vw - 24px)}}
 </style>
 </head>
 <body>
@@ -121,14 +150,14 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;touch-
   <div id="sfBody"></div></div></div>
 <div class="screen" id="sGame" hidden><canvas id="cv"></canvas>
   <div id="hud">
-    <div class="tl"><div class="bar"><i id="hpF"></i><span id="hpT"></span></div><div class="bar xp"><i id="xpF"></i></div><div id="hLv"></div></div>
+    <div class="tl"><div class="bar"><i id="hpF"></i><span id="hpT"></span></div><div class="bar xp"><i id="xpF"></i></div><div id="hLv"></div><div id="hSc"></div></div>
     <div id="hObj"></div>
-    <div class="tr"><div class="col"><button class="hb" id="bPause">Ⅱ</button><button class="hb" id="bBag">🎒</button></div><canvas id="mm" width="184" height="184"></canvas></div>
+    <div class="tr"><div class="col"><button class="hb" id="bPause">Ⅱ</button><button class="hb" id="bBag">包</button></div><canvas id="mm" width="184" height="184"></canvas></div>
     <div id="boss" hidden><div id="bossN"></div><div class="bar"><i id="bossF"></i></div></div>
     <div id="toasts"></div>
     <div id="radio" hidden><div id="rdW"></div><div id="rdT"></div></div>
     <div id="wpn"><div id="hW"></div><div id="hA"></div></div>
-    <div id="acts"><button class="ab" id="bMed">✚<small>医疗</small></button><button class="ab" id="bRel">⟳<small>换弹</small></button><button class="ab" id="bGren">💣<small>手雷</small></button><button class="ab" id="bDash">💨<small>翻滚</small></button></div>
+    <div id="acts"><button class="ab" id="bMed">✚<small>医疗</small></button><button class="ab" id="bRel">⟳<small>换弹</small></button><button class="ab" id="bGren">◉<small>手雷</small></button><button class="ab" id="bDash">»<small>翻滚</small></button></div>
     <div class="stk" id="stkL" hidden><i></i></div><div class="stk" id="stkR" hidden><i></i></div>
   </div></div>
 <script>window.YJ = {};</script>

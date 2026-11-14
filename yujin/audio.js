@@ -44,6 +44,7 @@ const SND = {
   level: v => [392, 523, 659, 784, 1047].forEach((f, i) => tone({ type: "triangle", f, d: .3, v: v * .25, t: ac.currentTime + i * .07 })),
   win: v => [392, 494, 587, 784, 587, 784, 988].forEach((f, i) => tone({ type: "triangle", f, d: .5, v: v * .25, t: ac.currentTime + i * .13 })),
   equip: v => { noise({ ft: "bandpass", f: 1800, q: 4, d: .05, v: v * .5 }); tone({ type: "triangle", f: 300, d: .08, v: v * .3 }); },
+  cut: v => { noise({ f: 2400, f2: 200, d: .12, v: v * .5 }); tone({ type: "sine", f: 120, f2: 50, d: .16, v: v * .6 }); },
   ui: v => tone({ type: "triangle", f: 620, d: .04, v: v * .14 }), type: v => tone({ type: "square", f: 1500 + Math.random() * 300, d: .012, v: v * .12 }),
   radio: v => { noise({ ft: "bandpass", f: 2400, q: 3, d: .09, v: v * .3 }); tone({ type: "square", f: 1200, d: .05, v: v * .1, t: ac.currentTime + .09 }); },
   zap: v => { noise({ ft: "highpass", f: 4000, d: .1, v: v * .4 }); tone({ type: "sawtooth", f: 1800, f2: 200, d: .12, v: v * .2 }); },
