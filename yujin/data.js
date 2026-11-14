@@ -1,22 +1,23 @@
 /* 余烬·尸潮 — 数据：武器、装备词条、天赋、敌人、关卡、剧情 */
-window.YJ = { TILE: 40, VERSION: "余烬 v4 · 写实人物" };
+window.YJ = { TILE: 40, VERSION: "余烬 v5 · 战力值" };
 
 YJ.RAR = [{ n: "普通", c: "#B9B9B9" }, { n: "精良", c: "#4FA3FF" }, { n: "稀有", c: "#FFD23F" }, { n: "传说", c: "#FF7A2F" }];
 YJ.SLOTS = { weapon: "武器", armor: "护甲", boots: "靴子", charm: "饰品" };
 
 /* 武器基底：dmg 单发伤害，rate 每秒发数，mag 弹匣，reload 换弹秒数，spread 散布(弧度)，speed 弹速，pellets 弹丸数 */
 YJ.WEAPONS = {
-  pistol:   { name: "手枪",     dmg: 17, rate: 4.2, mag: 12, reload: .9,  spread: .035, speed: 950, pellets: 1, pierce: 0, range: 560, kick: 2, w: 20 },
-  smg:      { name: "冲锋枪",   dmg: 10, rate: 11,  mag: 34, reload: 1.3, spread: .09,  speed: 900, pellets: 1, pierce: 0, range: 480, kick: 1.5, w: 20 },
-  shotgun:  { name: "霰弹枪",   dmg: 9,  rate: 1.4, mag: 6,  reload: 1.7, spread: .26,  speed: 820, pellets: 8, pierce: 0, range: 330, kick: 6, w: 18 },
-  rifle:    { name: "突击步枪", dmg: 21, rate: 7,   mag: 30, reload: 1.5, spread: .045, speed: 1100, pellets: 1, pierce: 1, range: 640, kick: 2.5, w: 18 },
-  sniper:   { name: "狙击枪",   dmg: 85, rate: 1.3, mag: 5,  reload: 1.9, spread: .005, speed: 1700, pellets: 1, pierce: 4, range: 900, kick: 7, w: 9 },
-  flamer:   { name: "喷火器",   dmg: 5,  rate: 24,  mag: 90, reload: 2.2, spread: .2,   speed: 400, pellets: 1, pierce: 99, range: 200, kick: 0, flame: 1, w: 8 },
-  launcher: { name: "榴弹发射器", dmg: 60, rate: 1.1, mag: 4, reload: 2.3, spread: .03,  speed: 560, pellets: 1, pierce: 0, range: 520, kick: 8, ex: 85, w: 7 }
+  pistol:   { name: "手枪",     dmg: 27, rate: 4.2, mag: 12, reload: .9,  spread: .035, speed: 950, pellets: 1, pierce: 0, range: 560, kick: 2, w: 20 },
+  smg:      { name: "冲锋枪",   dmg: 11, rate: 11,  mag: 34, reload: 1.3, spread: .09,  speed: 900, pellets: 1, pierce: 0, range: 480, kick: 1.5, w: 20 },
+  shotgun:  { name: "霰弹枪",   dmg: 10.5, rate: 1.4, mag: 6,  reload: 1.7, spread: .26,  speed: 820, pellets: 8, pierce: 0, range: 330, kick: 6, w: 18 },
+  rifle:    { name: "突击步枪", dmg: 17, rate: 7,   mag: 30, reload: 1.5, spread: .045, speed: 1100, pellets: 1, pierce: 1, range: 640, kick: 2.5, w: 18 },
+  sniper:   { name: "狙击枪",   dmg: 90, rate: 1.3, mag: 5,  reload: 1.9, spread: .005, speed: 1700, pellets: 1, pierce: 4, range: 900, kick: 7, w: 9 },
+  flamer:   { name: "喷火器",   dmg: 4.6, rate: 24,  mag: 90, reload: 2.2, spread: .2,   speed: 400, pellets: 1, pierce: 99, range: 200, kick: 0, flame: 1, w: 8 },
+  launcher: { name: "榴弹发射器", dmg: 82, rate: 1.1, mag: 4, reload: 2.3, spread: .03,  speed: 560, pellets: 1, pierce: 0, range: 520, kick: 8, ex: 85, w: 7 }
 };
-YJ.GEAR = { armor: { name: "防弹衣", imp: { hp: 28, armor: 4 } }, boots: { name: "军靴", imp: { ms: 5 } }, charm: { name: "护符", imp: {} } };
+YJ.GEAR = { armor: { name: "防弹衣", imp: { hp: 28, armor: 4 } }, boots: { name: "军靴", imp: { ms: 5, hp: 10 } }, charm: { name: "护符", imp: { dmg: 4, hp: 8 } } };
 
-/* 词条：k 属性，t 显示模板，a/b 数值范围（ilvl 越高越接近 b 并略有放大），s 可出现的部位，w 权重 */
+/* 词条：k 属性，t 显示模板，a/b 基础数值范围，s 可出现的部位，w 权重。存档里只存基础值，实际数值 = 基础值 × 物品等级系数（YJ.affV）：
+   grow（生命类）每级 +6%，flat（穿透/弹丸）不随等级变，其余百分比词条每级 +3% */
 YJ.AFFIX = [
   { k: "dmg", t: "伤害 +{}%", a: 6, b: 22, s: "weapon,charm", w: 10 },
   { k: "rate", t: "射速 +{}%", a: 5, b: 18, s: "weapon,charm", w: 9 },
@@ -29,10 +30,10 @@ YJ.AFFIX = [
   { k: "burn", t: "{}% 几率点燃", a: 8, b: 22, s: "weapon", w: 4 },
   { k: "shock", t: "{}% 几率电击连锁", a: 8, b: 20, s: "weapon", w: 4 },
   { k: "hp", t: "生命 +{}", a: 12, b: 45, s: "armor,boots,charm", w: 10, grow: 1 },
-  { k: "regen", t: "每秒回复 {} 生命", a: 0.6, b: 2.2, s: "armor,charm", w: 5, dec: 1 },
+  { k: "regen", t: "每秒回复 {} 生命", a: 0.6, b: 2.2, s: "armor,charm", w: 5, dec: 1, grow: 1 },
   { k: "armor", t: "减伤 +{}%", a: 3, b: 9, s: "armor,boots", w: 7 },
   { k: "ms", t: "移动速度 +{}%", a: 4, b: 12, s: "boots,charm", w: 8 },
-  { k: "lok", t: "击杀回复 {} 生命", a: 1, b: 4, s: "weapon,armor,charm", w: 5 },
+  { k: "lok", t: "击杀回复 {} 生命", a: 1, b: 4, s: "weapon,armor,charm", w: 5, grow: 1 },
   { k: "xp", t: "经验获取 +{}%", a: 6, b: 20, s: "charm,armor", w: 4 },
   { k: "mf", t: "掉落品质 +{}%", a: 8, b: 30, s: "charm,boots", w: 4 },
   { k: "gren", t: "手雷伤害 +{}%", a: 15, b: 50, s: "armor,charm", w: 4 },

@@ -122,13 +122,13 @@ function bake(L) {
    关节（髋/膝/踝/肩/肘/腕）先在三维里摆好姿势，再投影到屏幕、按远近排序画出来。
    走路是 8 帧循环：脚跟着地 → 全脚掌支撑 → 脚尖离地 → 屈膝前摆；步幅和移动距离绑定，落地的脚不打滑 */
 const PX = 40, YK = .76, ZK = .7, OUTC = "rgba(6,8,7,.9)", _sd = {};
-const sd = (hex, k) => _sd[hex + k] || (_sd[hex + k] = shade(hex, k));
+const hx = (hex, k) => _sd[hex + k] || (_sd[hex + k] = (() => { const n = parseInt(hex.slice(1), 16), f = v => Math.max(0, Math.min(255, v * k | 0)).toString(16).padStart(2, '0'); return '#' + f(n >> 16) + f((n >> 8) & 255) + f(n & 255); })());
 const lerp3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t], add3 = (a, x, y, z) => [a[0] + x, a[1] + y, a[2] + z];
 const BODY = {
   player: { s: 1, hipH: .9, hipW: .09, shW: .2, tor: .5, lean: .12, stride: .26, lift: .1, arm: "gun", m: 1.05 },
-  walker: { s: 1, hipH: .88, hipW: .09, shW: .19, tor: .5, lean: .3, tilt: .3, stride: .17, lift: .05, arm: "reach", m: 1, drag: 1 },
+  walker: { s: 1, hipH: .88, hipW: .09, shW: .19, tor: .5, lean: .3, tilt: .3, side: .045, stride: .17, lift: .05, arm: "reach", m: 1, drag: 1 },
   runner: { s: .95, hipH: .86, hipW: .08, shW: .17, tor: .47, lean: .55, tilt: -.25, stride: .34, lift: .16, arm: "flail", m: .8 },
-  spitter: { s: 1, hipH: .86, hipW: .1, shW: .19, tor: .48, lean: .38, tilt: -.35, stride: .12, lift: .04, arm: "hang", m: 1 },
+  spitter: { s: 1, side: -.03, hipH: .86, hipW: .1, shW: .19, tor: .48, lean: .38, tilt: -.35, stride: .12, lift: .04, arm: "hang", m: 1 },
   bloater: { s: 1.3, hipH: .8, hipW: .17, shW: .23, tor: .46, lean: .05, stride: .12, lift: .04, arm: "hang", out: .55, m: 1.45 },
   brute: { s: 1.45, hipH: .9, hipW: .11, shW: .27, tor: .52, lean: .2, tilt: .1, stride: .2, lift: .07, arm: "swing", m: 1.28 },
   crawler: { s: 1, stride: .14, m: 1 }
@@ -136,7 +136,7 @@ const BODY = {
 const BK = { player: "player", walker: "walker", runner: "runner", spitter: "spitter", bloater: "bloater", brute: "brute", elite: "brute", elite2: "brute", crawler: "crawler" };
 const CYC = k => 4 * BODY[BK[k]].stride * PX * BODY[BK[k]].s;
 function pose(B, p, stand) {
-  const J = {}, TW = TAU, hz = B.hipH - .03 - (stand ? 0 : .02 * Math.cos(2 * TW * p)), th = .45 * B.hipH / .9, sn = .43 * B.hipH / .9;
+  const J = {}, TW = TAU; const hz = J.hz = B.hipH - .03 - (stand ? 0 : .02 * Math.cos(2 * TW * p)), th = .45 * B.hipH / .9, sn = .43 * B.hipH / .9;
   for (let i = 0; i < 2; i++) { const sy = i ? 1 : -1, q = (p + (i ? .5 : 0)) % 1, dr = B.drag && i === 0, st = B.stride * (dr ? .4 : 1), lf = dr ? .006 : B.lift, off = dr ? -.1 : 0; let fx = off + (stand ? (i ? .03 : -.03) : 0), fz = 0, pit = 0;
     if (!stand) { if (q < .5) { const t = q * 2; fx = off + st * (1 - 2 * t); pit = t < .2 ? -(1 - t / .2) * .45 : t > .7 ? (t - .7) / .3 * .65 : 0; } else { const t = (q - .5) * 2, e = t * t * (3 - 2 * t); fx = off + st * (-1 + 2 * e); fz = lf * Math.sin(Math.PI * t); pit = .65 * (1 - t) - .45 * t; } if (dr) pit = .55; }
     let ax = fx, az = .07 + fz + Math.max(0, pit) * .09, dx = ax, dz = az - hz, Ld = Math.hypot(dx, dz); const mx = th + sn - .004; if (Ld > mx) { ax = dx / Ld * mx; az = hz + dz / Ld * mx; Ld = mx; dx = ax; dz = az - hz; }
@@ -147,95 +147,114 @@ function pose(B, p, stand) {
   for (let i = 0; i < 2; i++) { const sy = i ? 1 : -1, q = (p + (i ? .5 : 0)) % 1, sw = stand ? 0 : Math.cos(TW * q), S = [J.chest[0] - sy * (stand ? 0 : .035 * Math.cos(TW * p)), sy * B.shW, J.chest[2] - .03], ua = .29, fa = .27; let t1, bend, out = B.out || .1;
     if (B.arm === "swing") { t1 = ln - .55 * sw; bend = .25 + .35 * Math.max(0, -sw); } else if (B.arm === "reach") { t1 = ln + (i ? 1.2 : .9) + .1 * sw; bend = .25; out = .03; } else if (B.arm === "flail") { t1 = ln + .7 - 1.1 * sw; bend = 1.1; out = .25; } else { t1 = ln * .5 + .12 - .08 * sw; bend = .2; }
     const el = [S[0] + Math.sin(t1) * ua, S[1] + sy * out * ua, S[2] - Math.cos(t1) * ua]; J["sh" + i] = S; J["el" + i] = el; J["ha" + i] = [el[0] + Math.sin(t1 + bend) * fa, el[1] + sy * out * .1, el[2] - Math.cos(t1 + bend) * fa]; }
-  const hl = ln + (B.tilt || 0); J.head = [J.chest[0] + Math.sin(hl) * .2, 0, J.chest[2] + Math.cos(hl) * .2]; return J;
+  const hl = ln + (B.tilt || 0); J.head = [J.chest[0] + Math.sin(hl) * .215, B.side || 0, J.chest[2] + Math.cos(hl) * .215]; return J;
 }
-/* 给人形骨架穿衣服。S：皮肤/上衣/裤子/鞋 等颜色与开关 */
-function humanoid(F, J, B, S) { const { seg, ball, quad, fn, pr } = F, m = B.m;
+/* 给人形骨架"长肉穿衣"。不再用圆和胶囊拼接：
+   · 躯干、头是一圈圈椭圆截面包出来的连续曲线轮廓（贝塞尔曲线闭合）
+   · 四肢是上粗下细的锥形，肩/肘/膝处同一条轮廓连续过渡，没有接缝
+   · 整个人只在最外圈描一道细边，内部靠明暗渐变区分 */
+function humanoid(F, J, B, S) { const m = B.m, hw = B.hipW, c = S.chest || 1, ln = B.lean, spine = h => [Math.sin(ln) * h, 0, J.hz + Math.cos(ln) * h];
   for (let i = 0; i < 2; i++) { const hip = J["hip" + i], kn = J["knee" + i], an = J["ank" + i], bare = S.bareShin && S.bareShin[i];
-    seg(hip, kn, .15 * m, S.pants); seg(kn, an, .105 * m, bare ? S.skin : S.pants); if (bare) seg(kn, lerp3(kn, an, .3), .125 * m, S.pants, .001);
-    if (S.boot) seg(lerp3(kn, an, .55), an, .125 * m, S.shoe, .002); seg(J["heel" + i], J["toe" + i], .095 * m, S.barefoot ? S.skin : S.shoe, .003);
-    if (S.kneepad) { ball(add3(kn, .035, 0, 0), .072 * m, S.kneepad, .01); }
-    const sh = J["sh" + i], el = J["el" + i], ha = J["ha" + i]; seg(sh, el, .1 * m, S.sleeve ? S.shirt : S.skin); if (!S.sleeve) ball(sh, .066 * m, S.shirt, -.001);
-    seg(el, ha, .082 * m, S.sleeve === 2 ? S.shirt : S.skin); ball(ha, (S.fist || .05) * m, S.glove || S.skin, .002); }
-  seg(J.hip0, J.hip1, .2 * m, S.pants, .004);
-  const wl = add3(J.waist, 0, -B.hipW * 1.5, 0), wr = add3(J.waist, 0, B.hipW * 1.5, 0), tk = .19 * m * (S.chest || 1); quad([J.sh0, J.sh1, wr, wl], tk, S.shirt, .006);
-  // 衣服褶皱
-  fn(lerp3(J.chest, J.waist, .5), .02, (g, c, K) => { g.strokeStyle = "rgba(0,0,0,.28)"; g.lineWidth = 1; g.lineCap = "round"; for (const [a, b, t1, t2] of [[J.sh0, wl, .35, .55], [J.sh1, wr, .5, .3], [J.sh0, wl, .7, .85]]) { const p1 = pr(lerp3(lerp3(a, b, t1), J.chest, .25)), p2 = pr(lerp3(lerp3(J.sh1, wr, t2), J.chest, .2)); g.beginPath(); g.moveTo(p1[0], p1[1]); g.quadraticCurveTo((p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2 + 2, p2[0], p2[1]); g.stroke(); } });
-  seg(add3(J.chest, 0, 0, -.02), J.head, .078 * m, S.skin, 0);
-  const hr = (S.hr || .108) * (S.headM || 1); ball(J.head, hr, S.skin, .02); if (S.hair) ball(add3(J.head, -.04, 0, .03), hr * .93, S.hair, .021);
-  return { wl, wr, hr };
+    F.limb([hip, kn, an], [.088 * m, .06 * m, .04 * m], [S.pants, bare ? S.skin : S.pants]);
+    if (bare) F.limb([lerp3(hip, kn, .6), kn, lerp3(kn, an, .22)], [.076 * m, .064 * m, .056 * m], [S.pants, S.pants], .001); // 撕到膝盖的裤腿
+    if (S.boot) F.limb([lerp3(kn, an, .5), an], [.058 * m, .052 * m], [S.shoe], .002);
+    F.limb([J["heel" + i], J["toe" + i]], [(S.boot ? .054 : .046) * m, (S.boot ? .042 : .034) * m], [S.barefoot ? S.skin : S.shoe], .003);
+    if (S.kneepad) F.ell(add3(kn, .03, 0, 0), [.05, .058, .062], S.kneepad, .01);
+    const sh = J["sh" + i], el = J["el" + i], ha = J["ha" + i], d = [ha[0] - el[0], ha[1] - el[1], ha[2] - el[2]], dl = Math.hypot(d[0], d[1], d[2]) || 1, f = S.fist || .037;
+    F.limb([sh, el, ha], [.06 * m, .044 * m, .031 * m], [S.sleeve ? S.shirt : S.skin, S.sleeve === 2 ? S.shirt : S.skin]);
+    if (!S.sleeve) F.limb([sh, lerp3(sh, el, .32)], [.066 * m, .058 * m], [S.shirt], .001);
+    F.limb([ha, add3(ha, d[0] / dl * .09, d[1] / dl * .09, d[2] / dl * .09)], [f * m, f * .72 * m], [S.glove || S.skin], .002); }
+  F.sect([[-.05, hw + .075, .1], [.16, .13 * c, .095 * c]], S.pants, .004);
+  F.sect([[.11, .137 * c, .1 * c], [.33, .168 * c, .118 * c], [B.tor - .03, B.shW + .01, .092 * c], [B.tor + .045, .07, .062]], S.shirt, .006);
+  const wl = add3(J.waist, 0, -hw * 1.5, 0), wr = add3(J.waist, 0, hw * 1.5, 0);
+  F.fn(lerp3(J.chest, J.waist, .5), .02, g => { g.strokeStyle = "rgba(0,0,0,.26)"; g.lineWidth = .9; g.lineCap = "round"; for (const [a, b, t1, t2] of [[J.sh0, wl, .35, .55], [J.sh1, wr, .5, .3], [J.sh0, wl, .7, .85]]) { const p1 = F.pr(lerp3(lerp3(a, b, t1), J.chest, .3)), p2 = F.pr(lerp3(lerp3(J.sh1, wr, t2), J.chest, .25)); g.beginPath(); g.moveTo(p1[0], p1[1]); g.quadraticCurveTo((p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2 + 2, p2[0], p2[1]); g.stroke(); } }); // 衣服褶皱
+  const hm = S.headM || 1, nb = spine(B.tor + .03); F.limb([nb, lerp3(nb, J.head, .6)], [.054 * m, .046 * m], [S.skin], .012);
+  F.pts(F.eps(J.head, [.1 * hm, .082 * hm, .115 * hm]).concat(F.eps(add3(J.head, .03, 0, -.07), [.06 * hm, .058 * hm, .055 * hm])), S.skin, .02); // 颅骨 + 下颌
+  if (S.hair) F.ell(add3(J.head, -.03, 0, .035), [.1 * hm, .086 * hm, .1 * hm], S.hair, .021);
+  return { wl, wr, hr: .1 * hm, spine };
 }
 function zFace(F, J, hr, o) { const { pr } = F, hc = pr(J.head), eyes = []; o = o || {};
-  for (const sy of [-1, 1]) { const e = pr(add3(J.head, hr * .82, sy * hr * .42, .0)); if (e[2] > hc[2] - .012) eyes.push(e); }
-  const mo = pr(add3(J.head, hr * .88, 0, -hr * .5));
-  F.fn(add3(J.head, hr, 0, 0), .06, g => { if (mo[2] > hc[2] - .02) { g.fillStyle = o.mouth || "#260505"; g.beginPath(); g.ellipse(mo[0], mo[1], o.open ? 2.3 : 1.6, o.open ? 2 : 1.1, 0, 0, TAU); g.fill(); }
+  for (const sy of [-1, 1]) { const e = pr(add3(J.head, hr * .86, sy * hr * .42, -.01)); if (e[2] > hc[2] - .012) eyes.push(e); }
+  const mo = pr(add3(J.head, hr * .9, 0, -hr * .62));
+  F.fn(add3(J.head, hr, 0, 0), .06, g => { if (mo[2] > hc[2] - .02) { g.fillStyle = o.mouth || "#260505"; g.beginPath(); g.ellipse(mo[0], mo[1], o.open ? 2.1 : 1.5, o.open ? 1.8 : 1, 0, 0, TAU); g.fill(); }
     for (const e of eyes) { g.fillStyle = "rgba(255,40,20,.35)"; g.beginPath(); g.arc(e[0], e[1], 1.7, 0, TAU); g.fill(); g.fillStyle = "#ff3a26"; g.beginPath(); g.arc(e[0], e[1], .85, 0, TAU); g.fill(); } });
   return eyes.map(e => [e[0], e[1]]); }
 const stain = (F, P, r, col) => F.ball(P, r, col || "#6a0f0f", 0, 1);
 const DRESS = {
-  player(F, J, B, base, M) { const { seg, ball, quad, fn, pr } = F, C = J.chest;
-    const GL = { pistol: .2, smg: .5, shotgun: .78, rifle: .8, sniper: 1, flamer: .74, launcher: .72 }[base], pis = base === "pistol";
+  player(F, J, B, base, M) { const C = J.chest, GL = { pistol: .2, smg: .5, shotgun: .78, rifle: .8, sniper: 1, flamer: .74, launcher: .72 }[base], pis = base === "pistol";
     const g0 = pis ? add3(C, .4, .05, -.1) : add3(C, .04, .14, -.1), g1 = add3(g0, GL, pis ? 0 : -.07, -.04), gp = t => lerp3(g0, g1, t);
-    // 双手持枪：右手握把，左手托护木
-    J.ha1 = add3(gp(pis ? .1 : .3), 0, 0, -.04); J.el1 = add3(J.sh1, .03, .1, -.25); J.ha0 = add3(gp(pis ? .12 : .62), 0, -.03, -.04); J.el0 = add3(lerp3(J.sh0, J.ha0, .5), 0, -.07, -.1);
-    const S = { skin: "#b08a68", shirt: "#4b5a43", sleeve: 2, pants: "#414f3b", shoe: "#131415", boot: 1, kneepad: "#22262a", glove: "#17191a" }, R = humanoid(F, J, B, S);
-    quad([lerp3(J.sh0, C, .18), lerp3(J.sh1, C, .18), add3(R.wr, 0, -.02, .03), add3(R.wl, 0, .02, .03)], .225, "#2c342a", .012); // 战术背心
-    for (const [t, y] of [[.45, -.075], [.45, .075], [.72, 0]]) ball(add3(lerp3(C, J.waist, t), .125, y, 0), .046, "#39422f"); // 弹匣包
-    seg(add3(C, -.17, 0, -.05), add3(J.waist, -.16, 0, .05), .24, "#38452e"); seg(add3(C, -.18, -.1, .02), add3(C, -.18, .1, .02), .085, "#565b45", .004); // 背包 + 卷毯
-    ball(add3(J.head, 0, 0, .028), .128, "#4c5c41", .03); ball(add3(J.head, .1, 0, .05), .03, "#141617", .04); // 头盔
-    fn(add3(J.head, 0, 0, .1), .08, (g, c) => { g.strokeStyle = "rgba(210,220,190,.35)"; g.lineWidth = .8; g.beginPath(); g.moveTo(c[0] - 3, c[1] + 2); g.lineTo(c[0] - .5, c[1] + 3.2); g.moveTo(c[0] + 1.5, c[1] + .5); g.lineTo(c[0] + 3, c[1] + 2); g.stroke(); g.strokeStyle = "rgba(0,0,0,.4)"; g.beginPath(); g.arc(c[0], c[1] + 4.5, 5.2, .25, 2.9); g.stroke(); }); // 头盔划痕与帽檐
-    for (let i = 0; i < 2; i++) fn(add3(J["knee" + i], .06, 0, 0), .02, (g, c) => { g.fillStyle = "rgba(190,195,180,.3)"; g.fillRect(c[0] - 1, c[1] - 1, 2, 1.2); }); // 护膝磨损
-    // 步枪：枪托、机匣、弹匣、护木、枪管、枪口
-    if (!pis) seg(g0, gp(.24), .06, "#3b2c1f"); seg(gp(pis ? 0 : .24), gp(pis ? .6 : .52), base === "launcher" ? .11 : .074, base === "flamer" ? "#7a3a20" : "#1d1f22", .002);
-    seg(gp(pis ? .6 : .52), gp(.76), base === "launcher" ? .1 : .058, "#282b2f", .002); seg(gp(.74), g1, base === "shotgun" ? .04 : base === "launcher" ? .09 : .028, "#0d0e0f", .002); ball(g1, base === "launcher" ? .05 : .022, "#18191b", .003);
-    if (base === "rifle" || base === "smg" || base === "sniper") seg(gp(.42), add3(gp(.45), .01, 0, -.13), .046, "#141618", .001); if (base === "sniper") seg(add3(gp(.3), 0, 0, .06), add3(gp(.55), 0, 0, .06), .04, "#111314", .004);
-    if (base === "flamer") ball(add3(C, -.2, .12, -.2), .09, "#8a3f20", .001);
-    M.muz = pr(add3(g1, .04, 0, 0)); M.gun = pr(gp(.5)); },
-  walker(F, J, B, v, M) { const sk = "#73836d", S = { skin: sk, shirt: ["#aeb0a4", "#9aa4ab", "#b0a590"][v % 3], sleeve: 0, pants: "#3d5380", bareShin: [0, 1], shoe: "#1a1c1e", hair: ["#1f1a15", "#3a2e22", "#15171a"][v % 3] }, R = humanoid(F, J, B, S), C = J.chest;
+    J.ha1 = add3(gp(pis ? .1 : .3), 0, 0, -.04); J.el1 = add3(J.sh1, .03, .1, -.25); J.ha0 = add3(gp(pis ? .12 : .62), 0, -.03, -.04); J.el0 = add3(lerp3(J.sh0, J.ha0, .5), 0, -.07, -.1); // 右手握把，左手托护木
+    const S = { skin: "#b08a68", shirt: "#4b5a43", sleeve: 2, pants: "#414f3b", shoe: "#161718", boot: 1, kneepad: "#24282b", glove: "#191b1c" }, R = humanoid(F, J, B, S);
+    F.sect([[.13, .152, .118], [.34, .182, .136], [B.tor - .06, .168, .112]], "#2c342a", .012); // 战术背心
+    for (const [t, y] of [[.45, -.075], [.45, .075], [.72, 0]]) F.ell(add3(lerp3(C, J.waist, t), .13, y, 0), [.03, .04, .052], "#39422f"); // 弹匣包
+    F.ell(add3(lerp3(C, J.waist, .45), -.2, 0, 0), [.085, .13, .175], "#38452e"); F.seg(add3(C, -.2, -.1, .03), add3(C, -.2, .1, .03), .085, "#565b45", .004); // 背包 + 卷毯
+    F.ell(add3(J.head, 0, 0, .03), [.126, .112, .108], "#4c5c41", .03); F.ell(add3(J.head, .1, 0, .05), [.03, .035, .03], "#141617", .04); // 头盔
+    F.fn(add3(J.head, 0, 0, .1), .08, (g, c) => { g.strokeStyle = "rgba(210,220,190,.35)"; g.lineWidth = .7; g.beginPath(); g.moveTo(c[0] - 3, c[1] + 2); g.lineTo(c[0] - .5, c[1] + 3.2); g.moveTo(c[0] + 1.5, c[1] + .5); g.lineTo(c[0] + 3, c[1] + 2); g.stroke(); }); // 头盔划痕
+    for (let i = 0; i < 2; i++) F.fn(add3(J["knee" + i], .06, 0, 0), .02, (g, c) => { g.fillStyle = "rgba(190,195,180,.3)"; g.fillRect(c[0] - 1, c[1] - 1, 2, 1.2); }); // 护膝磨损
+    // 枪：枪托 → 机匣 → 护木 → 枪管，一条连续的锥形轮廓
+    const fat = base === "launcher" ? 1.6 : 1, rc = base === "flamer" ? "#7a3a20" : "#1d1f22";
+    if (pis) F.limb([g0, gp(.6), g1], [.034, .03, .016], [rc, "#0d0e0f"], .002);
+    else F.limb([g0, gp(.22), gp(.5), gp(.76), g1], [.026, .036 * fat, .036 * fat, .026 * fat, (base === "shotgun" ? .02 : .013) * fat], ["#3b2c1f", rc, "#282b2f", "#0d0e0f"], .002);
+    if (base === "rifle" || base === "smg" || base === "sniper") F.limb([gp(.42), add3(gp(.45), .01, 0, -.13)], [.024, .02], ["#141618"], .001); if (base === "sniper") F.seg(add3(gp(.3), 0, 0, .06), add3(gp(.55), 0, 0, .06), .04, "#111314", .004);
+    if (base === "flamer") F.ell(add3(C, -.2, .13, -.22), [.08, .08, .1], "#8a3f20", .001);
+    M.muz = F.pr(add3(g1, .04, 0, 0)); M.gun = F.pr(gp(.5)); },
+  walker(F, J, B, v, M) { const S = { skin: "#73836d", shirt: ["#aeb0a4", "#9aa4ab", "#b0a590"][v % 3], sleeve: 0, pants: "#3d5380", bareShin: [0, 1], shoe: "#1a1c1e", hair: ["#1f1a15", "#3a2e22", "#15171a"][v % 3] }, R = humanoid(F, J, B, S), C = J.chest;
     stain(F, add3(lerp3(C, J.waist, .4), .11, .04, 0), .05); stain(F, add3(lerp3(C, J.waist, .75), .1, -.06, 0), .038); stain(F, add3(C, -.1, .05, -.1), .045); stain(F, add3(J.sh1, 0, 0, .05), .035, "#4a0808"); // 血渍、肩上的咬痕
-    stain(F, lerp3(J.el0, J.ha0, .5), .028, "#3f5a3a"); stain(F, lerp3(J.el1, J.ha1, .4), .026, "#3f5a3a"); stain(F, lerp3(J.knee1, J.ank1, .6), .03, "#5a0d0d"); stain(F, add3(J.ha0, .02, 0, 0), .03, "#4a0808"); stain(F, add3(J.ha1, .02, 0, 0), .03, "#4a0808");
-    for (const t of [.1, .4, .65, .92]) { const a = lerp3(R.wl, R.wr, t); F.seg(a, add3(a, .01 - t * .02, 0, -.06 - (t * 7 % 1) * .06), .04, sd(S.shirt, .85), .005); } // 撕烂的衣摆
+    stain(F, lerp3(J.el0, J.ha0, .5), .026, "#3f5a3a"); stain(F, lerp3(J.el1, J.ha1, .4), .024, "#3f5a3a"); stain(F, lerp3(J.knee1, J.ank1, .6), .028, "#5a0d0d"); stain(F, add3(J.ha0, .05, 0, 0), .028, "#4a0808"); stain(F, add3(J.ha1, .05, 0, 0), .028, "#4a0808");
+    for (const t of [.1, .4, .65, .92]) { const a = add3(lerp3(R.wl, R.wr, t), 0, 0, -.02); F.limb([a, add3(a, .01 - t * .02, 0, -.07 - (t * 7 % 1) * .06)], [.03, .012], [hx(S.shirt, .88)], .005); } // 撕烂的衣摆
     M.eyes = zFace(F, J, R.hr); },
-  runner(F, J, B, v, M) { const sk = "#9d9c84", S = { skin: sk, shirt: "#6a3a34", chest: .82, sleeve: 0, pants: "#33302c", bareShin: [1, 1], barefoot: 1 }, R = humanoid(F, J, B, S), C = J.chest;
+  runner(F, J, B, v, M) { const S = { skin: "#9d9c84", shirt: "#6a3a34", chest: .82, sleeve: 0, pants: "#33302c", bareShin: [1, 1], barefoot: 1 }, R = humanoid(F, J, B, S), C = J.chest;
     stain(F, add3(lerp3(C, J.waist, .5), .09, 0, 0), .04); stain(F, add3(C, -.08, -.04, -.12), .04); stain(F, lerp3(J.knee0, J.ank0, .5), .025, "#5a0d0d"); stain(F, add3(J.head, -.03, .02, .09), .03, "#5a0d0d");
-    for (let i = 0; i < 3; i++) F.fn(lerp3(C, J.waist, .3 + i * .2), .03, (g, c) => { g.strokeStyle = "rgba(0,0,0,.3)"; g.lineWidth = .8; g.beginPath(); g.moveTo(c[0] - 3, c[1]); g.lineTo(c[0] + 3, c[1]); g.stroke(); }); // 肋骨
     M.eyes = zFace(F, J, R.hr, { open: 1 }); },
-  spitter(F, J, B, v, M) { const sk = "#a3aa4c", S = { skin: sk, shirt: "#8d9440", sleeve: 0, pants: "#454a2e", bareShin: [1, 1], barefoot: 1, hair: "#3a4a12" }, R = humanoid(F, J, B, S), C = J.chest;
-    for (const [x, y, z, r] of [[-.13, -.08, -.06, .052], [-.14, .07, -.12, .058], [-.12, -.03, -.24, .045], [-.11, .1, -.3, .04], [-.06, -.16, -.1, .04]]) F.ball(add3(C, x, y, z), r, "#e2d870"); // 背上的脓包
-    F.ball(add3(C, .12, 0, -.1), .078, "#b4e85a", .01); M.sac = F.pr(add3(C, .12, 0, -.1)); stain(F, add3(lerp3(C, J.waist, .7), .1, .03, 0), .04, "#55701c"); M.eyes = zFace(F, J, R.hr, { open: 1, mouth: "#8fd838" }); },
-  bloater(F, J, B, v, M) { const sk = "#7f9a48", S = { skin: sk, shirt: "#5c5a44", sleeve: 0, pants: "#4c4a34", bareShin: [1, 1], barefoot: 1, headM: .85 }, R = humanoid(F, J, B, S), bc = add3(J.waist, .07, 0, .1), br = .36;
-    F.ball(bc, br, sk, .01); for (const [x, y, z, r] of [[.2, .12, .2, .06], [.1, -.2, .22, .055], [-.1, .1, .3, .05], [.25, -.05, .05, .05], [0, .28, .1, .05], [-.2, -.15, .2, .045], [.05, 0, .34, .045]]) F.ball(add3(bc, x, y, z), r, "#e8de78", .012);
-    F.fn(add3(bc, 0, 0, br), .2, (g, c, K) => { const r = br * K; g.fillStyle = "rgba(255,255,255,.38)"; g.beginPath(); g.ellipse(c[0] - r * .32, c[1] + r * .55, r * .3, r * .14, -.6, 0, TAU); g.fill(); g.fillStyle = "rgba(255,255,255,.55)"; g.beginPath(); g.arc(c[0] - r * .5, c[1] + r * .78, r * .06, 0, TAU); g.fill(); g.strokeStyle = "rgba(24,44,10,.45)"; g.lineWidth = .9; g.beginPath(); g.moveTo(c[0], c[1] + r); g.quadraticCurveTo(c[0] + r * .4, c[1] + r * 1.1, c[0] + r * .6, c[1] + r * 1.5); g.moveTo(c[0], c[1] + r); g.quadraticCurveTo(c[0] - r * .3, c[1] + r * 1.4, c[0] - r * .1, c[1] + r * 1.8); g.stroke(); }); // 肚皮的高光和青筋
-    for (const t of [.15, .5, .85]) { const a = lerp3(J.sh0, J.sh1, t); F.seg(a, add3(a, .04, 0, -.12), .05, "#55533e", .02); } M.eyes = zFace(F, J, R.hr); },
-  brute(F, J, B, o, M) { o = o || { vest: "#3a4048", pad: "#23272c", cap: "#2a2f34" }; const sk = o.skin || "#6a7566", S = { skin: sk, shirt: sd(o.vest, .8), sleeve: 0, pants: "#2c3238", boot: 1, shoe: "#0f1011", kneepad: "#2a2e32", fist: .062, headM: .95 }, R = humanoid(F, J, B, S), C = J.chest;
-    F.quad([lerp3(J.sh0, C, .12), lerp3(J.sh1, C, .12), add3(R.wr, 0, 0, .04), add3(R.wl, 0, 0, .04)], .235, o.vest, .012); for (let i = 0; i < 2; i++) F.ball(add3(J["sh" + i], 0, 0, .03), .078, o.pad, .014);
-    stain(F, add3(lerp3(C, J.waist, .45), .16, .05, 0), .06); stain(F, add3(C, -.15, -.06, -.12), .05); stain(F, add3(J.ha0, .03, 0, 0), .05, "#4a0808"); stain(F, add3(J.ha1, .03, 0, 0), .05, "#4a0808");
-    F.ball(add3(J.head, -.035, 0, .035), R.hr * .98, o.cap, .03);
+  spitter(F, J, B, v, M) { const S = { skin: "#a3aa4c", shirt: "#8d9440", sleeve: 0, pants: "#454a2e", bareShin: [1, 1], barefoot: 1, hair: "#3a4a12" }, R = humanoid(F, J, B, S), C = J.chest;
+    for (const [x, y, z, r] of [[-.13, -.08, -.06, .05], [-.14, .07, -.12, .056], [-.12, -.03, -.24, .044], [-.11, .1, -.3, .04], [-.06, -.16, -.1, .038]]) F.ball(add3(C, x, y, z), r, "#e2d870"); // 背上的脓包
+    F.ell(add3(C, .12, 0, -.1), [.07, .08, .085], "#b4e85a", .01); M.sac = F.pr(add3(C, .12, 0, -.1)); stain(F, add3(lerp3(C, J.waist, .7), .1, .03, 0), .04, "#55701c"); M.eyes = zFace(F, J, R.hr, { open: 1, mouth: "#8fd838" }); },
+  bloater(F, J, B, v, M) { const sk = "#7f9a48", S = { skin: sk, shirt: "#5c5a44", chest: 1.25, sleeve: 0, pants: "#4c4a34", bareShin: [1, 1], barefoot: 1, headM: .88 }, R = humanoid(F, J, B, S), bc = add3(J.waist, .07, 0, .1), br = .36;
+    F.ell(bc, [br, br * 1.05, br * .95], sk, .01); for (const [x, y, z, r] of [[.2, .12, .2, .055], [.1, -.2, .22, .05], [-.1, .1, .3, .048], [.25, -.05, .05, .046], [0, .28, .1, .046], [-.2, -.15, .2, .042], [.05, 0, .34, .042]]) F.ball(add3(bc, x, y, z), r, "#e8de78", .012);
+    F.fn(add3(bc, 0, 0, br), .2, (g, c, K) => { const r = br * K; g.fillStyle = "rgba(255,255,255,.34)"; g.beginPath(); g.ellipse(c[0] - r * .32, c[1] + r * .5, r * .3, r * .13, -.6, 0, TAU); g.fill(); g.strokeStyle = "rgba(24,44,10,.4)"; g.lineWidth = .9; g.beginPath(); g.moveTo(c[0], c[1] + r * .9); g.quadraticCurveTo(c[0] + r * .4, c[1] + r * 1, c[0] + r * .55, c[1] + r * 1.35); g.moveTo(c[0], c[1] + r * .9); g.quadraticCurveTo(c[0] - r * .3, c[1] + r * 1.25, c[0] - r * .1, c[1] + r * 1.6); g.stroke(); }); // 肚皮的高光和青筋
+    M.eyes = zFace(F, J, R.hr); },
+  brute(F, J, B, o, M) { o = o || { vest: "#3a4048", pad: "#23272c", cap: "#2a2f34" }; const S = { skin: o.skin || "#6a7566", shirt: hx(o.vest, .8), chest: 1.3, sleeve: 0, pants: "#2c3238", boot: 1, shoe: "#0f1011", kneepad: "#2a2e32", fist: .052, headM: .98 }, R = humanoid(F, J, B, S), C = J.chest;
+    F.sect([[.12, .2, .15], [.34, .25, .175], [B.tor - .06, .24, .14]], o.vest, .012); for (let i = 0; i < 2; i++) F.ell(add3(J["sh" + i], 0, 0, .03), [.08, .085, .06], o.pad, .014);
+    stain(F, add3(lerp3(C, J.waist, .45), .19, .05, 0), .06); stain(F, add3(C, -.16, -.06, -.12), .05); stain(F, add3(J.ha0, .06, 0, 0), .045, "#4a0808"); stain(F, add3(J.ha1, .06, 0, 0), .045, "#4a0808");
+    F.ell(add3(J.head, -.03, 0, .035), [.105, .094, .1], o.cap, .03);
     if (o.cross) F.fn(add3(J.head, 0, 0, .13), .1, (g, c) => { g.fillStyle = "#b3261c"; g.fillRect(c[0] - 3, c[1] + 4, 6, 2); g.fillRect(c[0] - 1, c[1] + 2, 2, 6); }); else F.fn(add3(J.head, 0, 0, .13), .1, (g, c) => { g.strokeStyle = "rgba(0,0,0,.6)"; g.lineWidth = 1; g.beginPath(); g.moveTo(c[0] - 3, c[1] + 2); g.lineTo(c[0], c[1] + 5); g.lineTo(c[0] - 1, c[1] + 9); g.stroke(); });
     M.eyes = zFace(F, J, R.hr); },
   elite(F, J, B, v, M) { DRESS.brute(F, J, B, { vest: "#cdd6d0", pad: "#9aa69f", cap: "#eef1ef", cross: 1, skin: "#9aa89c" }, M); },
   elite2(F, J, B, v, M) { DRESS.brute(F, J, B, { vest: "#4a2a2a", pad: "#6a1c18", cap: "#3a1512" }, M); },
-  crawler(F, J0, B, v, M) { const sk = "#5b6858", p = F.p, J = { head: [.33, 0, .22], chest: [.14, 0, .17] }, st = [-.3, 0, .09];
-    F.fn([-.6, 0, 0], -9, (g) => { const a = F.pr([-.3, 0, 0]), b = F.pr([-.85, 0, 0]), q = g.createLinearGradient(a[0], a[1], b[0], b[1]); q.addColorStop(0, "rgba(95,8,8,.85)"); q.addColorStop(1, "rgba(95,8,8,0)"); g.strokeStyle = q; g.lineWidth = 8; g.lineCap = "round"; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); }); // 身后的血痕
-    for (let i = 0; i < 2; i++) { const sy = i ? 1 : -1, sw = F.stand ? 0 : Math.cos(TAU * (p + i * .5)), sh = [.14, sy * .17, .16], el = [.24 + .06 * sw, sy * .33, .12 + .05 * Math.max(0, sw)], ha = [.46 + .14 * sw, sy * .22, .03 + .05 * Math.max(0, Math.sin(TAU * (p + i * .5)))];
-      J["sh" + i] = sh; F.seg(sh, el, .095, sk); F.seg(el, ha, .08, sk); F.ball(ha, .05, sk, .002); stain(F, add3(ha, .02, 0, 0), .03, "#4a0808"); F.ball(sh, .065, "#454d52", -.001); }
-    F.quad([J.sh0, J.sh1, [-.3, .1, .09], [-.3, -.1, .09]], .17, "#454d52", .004); F.ball(st, .07, "#5a0c0c", -.002); F.ball(add3(st, -.06, .04, -.03), .045, "#6a1410", -.003); F.seg(st, add3(st, -.12, -.02, -.05), .025, "#d8d0b8", -.004);
-    stain(F, [0, .05, .26], .05); stain(F, [-.15, -.06, .2], .04); F.seg([.2, 0, .18], J.head, .075, sk); F.ball(J.head, .108, sk, .02); F.ball(add3(J.head, -.04, 0, .03), .1, "#15130f", .021); M.eyes = zFace(F, J, .108); }
+  crawler(F, J0, B, v, M) { const sk = "#5b6858", p = F.p, J = { head: [.34, 0, .22] }, st = [-.3, 0, .09];
+    F.fn([-.6, 0, 0], -9, g => { const a = F.pr([-.3, 0, 0]), b = F.pr([-.85, 0, 0]), q = g.createLinearGradient(a[0], a[1], b[0], b[1]); q.addColorStop(0, "rgba(95,8,8,.85)"); q.addColorStop(1, "rgba(95,8,8,0)"); g.strokeStyle = q; g.lineWidth = 8; g.lineCap = "round"; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke(); }); // 身后的血痕
+    const shs = []; for (let i = 0; i < 2; i++) { const sy = i ? 1 : -1, ph = TAU * (p + i * .5), sw = F.stand ? 0 : Math.cos(ph), sh = [.14, sy * .17, .16], el = [.24 + .06 * sw, sy * .33, .12 + .05 * Math.max(0, sw)], ha = [.46 + .14 * sw, sy * .22, .03 + (F.stand ? 0 : .05 * Math.max(0, Math.sin(ph)))];
+      shs.push(sh); F.limb([sh, el, ha], [.058, .042, .03], [sk, sk]); F.limb([ha, add3(ha, .09, -sy * .02, -.01)], [.036, .026], [sk], .002); stain(F, add3(ha, .06, 0, 0), .028, "#4a0808"); F.limb([sh, lerp3(sh, el, .4)], [.064, .056], ["#454d52"], .001); }
+    F.pts([shs[0], shs[1], [-.3, .1, .09], [-.3, -.1, .09], [0, .14, .15], [0, -.14, .15]], "#454d52", .004, .085); F.ell(st, [.08, .1, .06], "#5a0c0c", -.002); F.limb([st, add3(st, -.13, -.02, -.05)], [.016, .008], ["#d8d0b8"], -.004);
+    stain(F, [0, .05, .26], .05); stain(F, [-.15, -.06, .2], .04); F.limb([[.2, 0, .18], [.29, 0, .21]], [.05, .044], [sk], .01);
+    F.pts(F.eps(J.head, [.1, .082, .1]).concat(F.eps(add3(J.head, .05, 0, -.05), [.06, .058, .05])), sk, .02); F.ell(add3(J.head, -.03, 0, .03), [.1, .086, .09], "#15130f", .021); M.eyes = zFace(F, J, .1); }
 };
+function hull2(P) { P = P.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]); const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]), lo = [], up = [];
+  for (const p of P) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); } for (let i = P.length - 1; i >= 0; i--) { const p = P[i]; while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); } lo.pop(); up.pop(); return lo.concat(up); }
 /* 画一个角色到 g 的原点（脚下）。返回眼睛、枪口等位置 */
 function figure(g, type, v, ang, p, stand) {
   const B = BODY[BK[type]], K = PX * B.s, ca = Math.cos(ang), sa = Math.sin(ang), parts = [], M = { eyes: [] };
   const pr = P => { const wy = P[0] * sa + P[1] * ca; return [(P[0] * ca - P[1] * sa) * K, wy * K * YK - P[2] * K * ZK, wy * .5 + P[2] * .87]; };
-  const F = { pr, p, stand, seg: (A, Bq, w, col, bias) => { const a = pr(A), b = pr(Bq); parts.push([(a[2] + b[2]) / 2 + (bias || 0), 0, a, b, w * K, col]); }, ball: (C, r, col, bias, flat) => { const c = pr(C); parts.push([c[2] + (bias || 0) + (flat ? .03 : 0), 1, c, r * K, col, flat]); },
-    quad: (pts, w, col, bias) => { const q = pts.map(pr); parts.push([(q[0][2] + q[1][2] + q[2][2] + q[3][2]) / 4 + (bias || 0), 2, q, w * K, col]); }, fn: (C, bias, f) => { const c = pr(C); parts.push([c[2] + bias, 3, c, f]); } };
-  const J = type === "crawler" ? null : pose(B, p, stand); DRESS[type](F, J, B, v, M); if (J) { const h = pr(J.head); M.top = h[1] - .13 * K; M.chest = pr(J.chest); } else { M.top = -16; M.chest = [0, -6]; }
+  const J = type === "crawler" ? null : pose(B, p, stand), ln = B.lean || 0;
+  const eps = (C, r) => { const o = []; for (let i = 0; i < 10; i++) { const a = i / 10 * TAU, c = Math.cos(a), s = Math.sin(a); o.push([C[0] + r[0] * c, C[1] + r[1] * s, C[2]], [C[0] + r[0] * c, C[1], C[2] + r[2] * s], [C[0], C[1] + r[1] * c, C[2] + r[2] * s]); } return o; };
+  const pts = (P3, col, bias, pad) => { let q = P3.map(pr), d = 0; for (const a of q) d += a[2]; d /= q.length; if (pad) { const r = pad * K, o = []; for (const a of q) for (let i = 0; i < 8; i++) o.push([a[0] + Math.cos(i * .785) * r, a[1] + Math.sin(i * .785) * r]); q = o; } parts.push([d + (bias || 0), 2, hull2(q), col]); };
+  const F = { pr, p, stand, eps, pts, fn: (C, bias, f) => { const c = pr(C); parts.push([c[2] + bias, 3, c, f]); },
+    limb: (P, R, cols, bias) => { const q = P.map(pr), sg = []; let d = 0; for (const a of q) d += a[2]; for (let i = 0; i < q.length - 1; i++) sg.push([q[i], q[i + 1], R[i] * K, R[i + 1] * K, cols[i] || cols[cols.length - 1]]); parts.push([d / q.length + (bias || 0), 0, sg]); },
+    seg: (A, Bq, w, col, bias) => F.limb([A, Bq], [w / 2, w / 2], [col], bias), ell: (C, r, col, bias) => pts(eps(C, r), col, bias),
+    ball: (C, r, col, bias, flat) => { if (flat) { const c = pr(C); parts.push([c[2] + (bias || 0) + .03, 1, c, r * K, col]); } else pts(eps(C, [r, r, r]), col, bias); },
+    sect: (L, col, bias) => { const o = []; for (const [h, w, d] of L) { const cx = Math.sin(ln) * h, cz = J.hz + Math.cos(ln) * h; for (let i = 0; i < 12; i++) { const a = i / 12 * TAU; o.push([cx + Math.cos(ln) * d * Math.cos(a), w * Math.sin(a), cz - Math.sin(ln) * d * Math.cos(a)]); } } pts(o, col, bias); } };
+  DRESS[type](F, J, B, v, M); if (J) { const h = pr(J.head); M.top = h[1] - .13 * K; M.chest = pr(J.chest); } else { M.top = -16; M.chest = [0, -6]; }
   parts.sort((a, b) => a[0] - b[0]); g.lineCap = "round"; g.lineJoin = "round";
+  // 锥形肢体：两端半径不同的圆之间连切线，多段首尾相接成一条连续轮廓
+  const taper = (a, b, ra, rb) => { const dx = b[0] - a[0], dy = b[1] - a[1], d = Math.hypot(dx, dy); if (d < Math.abs(ra - rb) + .01) { const c = ra > rb ? a : b, r = Math.max(ra, rb); g.moveTo(c[0] + r, c[1]); g.arc(c[0], c[1], r, 0, TAU); return; } const ph = Math.atan2(dy, dx), be = Math.acos((ra - rb) / d); g.moveTo(a[0] + Math.cos(ph + be) * ra, a[1] + Math.sin(ph + be) * ra); g.arc(a[0], a[1], ra, ph + be, ph - be + TAU); g.arc(b[0], b[1], rb, ph - be, ph + be); g.closePath(); };
+  const smooth = H => { const n = H.length; g.moveTo((H[n - 1][0] + H[0][0]) / 2, (H[n - 1][1] + H[0][1]) / 2); for (let i = 0; i < n; i++) { const q = H[(i + 1) % n]; g.quadraticCurveTo(H[i][0], H[i][1], (H[i][0] + q[0]) / 2, (H[i][1] + q[1]) / 2); } g.closePath(); };
+  const path = q => { g.beginPath(); if (q[1] === 0) for (const s of q[2]) taper(s[0], s[1], s[2], s[3]); else smooth(q[2]); };
+  g.strokeStyle = OUTC; g.lineWidth = 2.3; for (const q of parts) if (q[1] === 0 || q[1] === 2) { path(q); g.stroke(); } // 第一遍：只留下整个人最外圈的一道细边
   for (const q of parts) { const k = q[1];
-    if (k === 0) { const a = q[2], b = q[3], w = q[4], col = q[5]; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.strokeStyle = OUTC; g.lineWidth = w + 1.3; g.stroke(); g.strokeStyle = col; g.lineWidth = w; g.stroke();
-      if (w > 2.4) { g.globalAlpha = .4; g.strokeStyle = sd(col, 1.45); g.lineWidth = w * .3; g.beginPath(); g.moveTo(a[0] - w * .2, a[1] - w * .22); g.lineTo(b[0] - w * .2, b[1] - w * .22); g.stroke(); g.strokeStyle = sd(col, .5); g.beginPath(); g.moveTo(a[0] + w * .22, a[1] + w * .24); g.lineTo(b[0] + w * .22, b[1] + w * .24); g.stroke(); g.globalAlpha = 1; } }
-    else if (k === 1) { const c = q[2], r = q[3], col = q[4]; g.beginPath(); g.arc(c[0], c[1], r, 0, TAU); if (q[5]) { const hh = h2(c[0] * 7 | 0, c[1] * 5 | 0, 9); g.globalAlpha = .78; g.fillStyle = col; g.beginPath(); g.ellipse(c[0], c[1], r, r * .55, hh * 3, 0, TAU); g.ellipse(c[0] + r * (hh - .5), c[1] + r * .5, r * .5, r * .35, hh * 5, 0, TAU); g.ellipse(c[0] - r * .7, c[1] - r * .3 * hh, r * .3, r * .22, 0, 0, TAU); g.fill(); g.globalAlpha = 1; } else { const gr = g.createRadialGradient(c[0] - r * .35, c[1] - r * .4, r * .1, c[0], c[1], r); gr.addColorStop(0, sd(col, 1.45)); gr.addColorStop(.55, col); gr.addColorStop(1, sd(col, .5)); g.fillStyle = gr; g.fill(); g.strokeStyle = OUTC; g.lineWidth = 1; g.stroke(); } }
-    else if (k === 2) { const P = q[2], w = q[3], col = q[4], path = () => { g.beginPath(); g.moveTo(P[0][0], P[0][1]); for (let i = 1; i < 4; i++) g.lineTo(P[i][0], P[i][1]); g.closePath(); }; path(); g.strokeStyle = OUTC; g.lineWidth = w + 1.3; g.stroke(); g.strokeStyle = col; g.lineWidth = w; g.stroke(); g.fillStyle = col; g.fill();
-      g.globalAlpha = .3; g.strokeStyle = sd(col, 1.45); g.lineWidth = w * .34; g.beginPath(); g.moveTo(P[0][0] - w * .2, P[0][1] - w * .2); g.lineTo(P[1][0] - w * .2, P[1][1] - w * .2); g.stroke(); g.strokeStyle = sd(col, .5); g.beginPath(); g.moveTo(P[3][0] + w * .2, P[3][1] + w * .22); g.lineTo(P[2][0] + w * .2, P[2][1] + w * .22); g.stroke(); g.globalAlpha = 1; }
+    if (k === 0) { path(q); g.strokeStyle = "rgba(0,0,0,.3)"; g.lineWidth = 1.2; g.stroke();
+      for (const s of q[2]) { const a = s[0], b = s[1], r = Math.max(s[2], s[3]), col = s[4]; let nx = -(b[1] - a[1]), ny = b[0] - a[0]; const nl = Math.hypot(nx, ny); if (nl < .01) { nx = -.7; ny = -.7; } else { nx /= nl; ny /= nl; if (nx + ny > 0) { nx = -nx; ny = -ny; } } const mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2, gr = g.createLinearGradient(mx + nx * r, my + ny * r, mx - nx * r, my - ny * r); gr.addColorStop(0, hx(col, 1.3)); gr.addColorStop(.45, col); gr.addColorStop(1, hx(col, .55)); g.fillStyle = gr; g.beginPath(); taper(a, b, s[2], s[3]); g.fill(); } }
+    else if (k === 2) { const H = q[2], col = q[3]; let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (const a of H) { if (a[0] < x0) x0 = a[0]; if (a[0] > x1) x1 = a[0]; if (a[1] < y0) y0 = a[1]; if (a[1] > y1) y1 = a[1]; } path(q); g.strokeStyle = "rgba(0,0,0,.3)"; g.lineWidth = 1.2; g.stroke(); const gr = g.createLinearGradient(x0, y0, x1, y1); gr.addColorStop(0, hx(col, 1.32)); gr.addColorStop(.45, col); gr.addColorStop(1, hx(col, .55)); g.fillStyle = gr; g.fill(); }
+    else if (k === 1) { const c = q[2], r = q[3], hh = h2(c[0] * 7 | 0, c[1] * 5 | 0, 9); g.globalAlpha = .78; g.fillStyle = q[4]; g.beginPath(); g.ellipse(c[0], c[1], r, r * .55, hh * 3, 0, TAU); g.ellipse(c[0] + r * (hh - .5), c[1] + r * .5, r * .5, r * .35, hh * 5, 0, TAU); g.ellipse(c[0] - r * .7, c[1] - r * .3 * hh, r * .3, r * .22, 0, 0, TAU); g.fill(); g.globalAlpha = 1; }
     else q[3](g, q[2], K); }
   return M;
 }

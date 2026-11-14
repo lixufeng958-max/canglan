@@ -128,12 +128,13 @@ function panel(root) {
   root.querySelectorAll(".tabs button").forEach(b => b.onclick = () => { tab = b.dataset.t; sel = null; panel(root); SFX("ui"); });
   const B = root.querySelector(".pbody");
   if (tab === "bag") {
-    const cell = (it, slot) => `<button class="cell ${it ? "r" + it.rar : "empty"} ${sel && it && sel.id === it.id ? "sel" : ""}" data-id="${it ? it.id : ""}">${it ? `<b>${icon(it)}</b><small>${it.ilvl}</small>` : `<span>${YJ.SLOTS[slot] || ""}</span>`}</button>`;
+    const cell = (it, slot) => `<button class="cell ${it ? "r" + it.rar : "empty"} ${sel && it && sel.id === it.id ? "sel" : ""}" data-id="${it ? it.id : ""}">${it ? `<b>${icon(it)}</b><small>${YJ.power(it)}</small>` : `<span>${YJ.SLOTS[slot] || ""}</span>`}</button>`;
     B.innerHTML = `<div class="eq">${Object.keys(YJ.SLOTS).map(s => `<div><label>${YJ.SLOTS[s]}</label>${cell(P.eq[s], s)}</div>`).join("")}<div class="scr">⚙ 零件<b>${P.scrap}</b><br>✚ 医疗包<b>${P.med}</b></div></div><div class="grid">${P.inv.map(it => cell(it)).join("")}${Array.from({ length: Math.max(0, 30 - P.inv.length) }, () => `<button class="cell empty"></button>`).join("")}</div>
-      <div class="bagops"><button class="btn sm ghost" id="salvAll">分解全部普通/精良</button></div><div class="detail" id="dt"></div>`;
+      <div class="bagops"><button class="btn sm ghost" id="sortInv">按战力整理</button> <button class="btn sm ghost" id="salvAll">分解全部普通/精良</button></div><div class="detail" id="dt"></div>`;
     B.querySelectorAll(".cell[data-id]").forEach(b => { if (b.dataset.id) b.onclick = () => { sel = [...Object.values(P.eq), ...P.inv].find(i => i && i.id == b.dataset.id); panel(root); SFX("ui"); }; });
+    B.querySelector("#sortInv").onclick = () => { const o = { weapon: 0, armor: 1, boots: 2, charm: 3 }; P.inv.sort((a, b) => o[a.slot] - o[b.slot] || YJ.power(b) - YJ.power(a)); sel = null; SFX("ui"); panel(root); };
     B.querySelector("#salvAll").onclick = () => { let n = 0; P.inv = P.inv.filter(it => { if (it.rar <= 1) { P.scrap += YJ.scrapOf(it); n++; return false; } return true; }); sel = null; SFX("pick"); panel(root); if (n) G.toast("分解了 " + n + " 件"); };
-    if (sel) detail(B.querySelector("#dt"), sel, root); else B.querySelector("#dt").innerHTML = `<p class="tip">点一件装备查看详情。背包 ${P.inv.length}/30</p>`;
+    if (sel) detail(B.querySelector("#dt"), sel, root); else B.querySelector("#dt").innerHTML = `<p class="tip">点一件装备查看详情，格子右下角的数字是<b>战力</b>：同稀有度下物品等级越高战力越高。背包 ${P.inv.length}/30</p>`;
   } else if (tab === "tal") {
     B.innerHTML = `<p class="tip">每升一级得 1 点天赋，每项最多 5 级。剩余 <b style="color:#ffd23f">${P.pts}</b> 点　等级 ${P.lv}</p><div class="tals">${YJ.TALENTS.map(t => { const n = P.tal[t.k] || 0; return `<button class="tal ${n ? "has" : ""}" data-k="${t.k}" ${P.pts && n < 5 ? "" : "disabled"}><i>${t.ic}</i><b>${t.n}</b><small>${t.d}</small><span>${"●".repeat(n)}${"○".repeat(5 - n)}</span></button>`; }).join("")}</div>`;
     B.querySelectorAll(".tal").forEach(b => b.onclick = () => { const k = b.dataset.k; if (P.pts > 0 && (P.tal[k] || 0) < 5) { P.tal[k] = (P.tal[k] || 0) + 1; P.pts--; YJ.refreshWeapon(); SFX("level", .5); panel(root); } });
@@ -144,11 +145,11 @@ function panel(root) {
 }
 const icon = it => it.slot === "weapon" ? { pistol: "手", smg: "冲", shotgun: "霰", rifle: "步", sniper: "狙", flamer: "焰", launcher: "榴" }[it.base] : { armor: "甲", boots: "靴", charm: "饰" }[it.slot];
 function detail(box, it, root) {
-  const P = G.P, R = YJ.RAR[it.rar], equipped = P.eq[it.slot] === it, cur = YJ.calcStats(), alt = equipped ? cur : YJ.calcStats(it), dd = alt.dps - cur.dps, dh = alt.maxhp - cur.maxhp;
+  const P = G.P, R = YJ.RAR[it.rar], equipped = P.eq[it.slot] === it, cur = YJ.calcStats(), alt = equipped ? cur : YJ.calcStats(it), dd = alt.dps - cur.dps, dh = alt.maxhp - cur.maxhp, pd = YJ.power(it) - (P.eq[it.slot] ? YJ.power(P.eq[it.slot]) : 0);
   let base = ""; if (it.slot === "weapon") { const B = YJ.WEAPONS[it.base]; base = `<div class="bs">单发 ${Math.round(B.dmg * YJ.wScale(it))}${B.pellets > 1 ? "×" + B.pellets : ""} · 射速 ${B.rate} · 弹匣 ${B.mag}${B.pierce ? " · 穿透 " + B.pierce : ""}${B.ex ? " · 爆炸" : ""}${B.flame ? " · 喷射" : ""}</div>`; } else { const im = YJ.impOf(it); base = `<div class="bs">${Object.keys(im).map(k => YJ.AFFIX.find(a => a.k === k).t.replace("{}", im[k])).join(" · ") || "无基础属性"}</div>`; }
   const up = YJ.upCost(it), rr = YJ.rerollCost(it);
-  box.innerHTML = `<div class="dcard" style="--rc:${R.c}"><h4>${esc(YJ.itemName(it))}</h4><div class="sub">${R.n} · ${YJ.SLOTS[it.slot]} · 物品等级 ${it.ilvl}</div>${base}${it.aff.map(a => `<div class="af">◆ ${YJ.affText(a)}</div>`).join("")}${it.leg ? `<div class="lg">★ ${YJ.LEG[it.leg].n}：${YJ.LEG[it.leg].d}</div>` : ""}
-    ${equipped ? `<div class="cmp">已装备</div>` : `<div class="cmp">换上后：每秒伤害 <b class="${dd > 0 ? "up" : dd < 0 ? "dn" : ""}">${dd >= 0 ? "+" : ""}${dd}</b>　生命 <b class="${dh > 0 ? "up" : dh < 0 ? "dn" : ""}">${dh >= 0 ? "+" : ""}${dh}</b></div>`}
+  box.innerHTML = `<div class="dcard" style="--rc:${R.c}"><h4>${esc(YJ.itemName(it))}</h4><div class="sub">${R.n} · ${YJ.SLOTS[it.slot]} · 物品等级 ${it.ilvl}　<b class="pw">战力 ${YJ.power(it)}</b></div>${base}${it.aff.map(a => `<div class="af">◆ ${YJ.affText(a, it)}</div>`).join("")}${it.leg ? `<div class="lg">★ ${YJ.LEG[it.leg].n}：${YJ.LEG[it.leg].d}</div>` : ""}
+    ${equipped ? `<div class="cmp">已装备</div>` : `<div class="cmp">换上后：战力 <b class="${pd > 0 ? "up" : pd < 0 ? "dn" : ""}">${pd >= 0 ? "+" : ""}${pd}</b>　每秒伤害 <b class="${dd > 0 ? "up" : dd < 0 ? "dn" : ""}">${dd >= 0 ? "+" : ""}${dd}</b>　生命 <b class="${dh > 0 ? "up" : dh < 0 ? "dn" : ""}">${dh >= 0 ? "+" : ""}${dh}</b></div>`}
     <div class="ops">${equipped ? "" : `<button class="btn sm" id="dEq">装备</button>`}<button class="btn sm ghost" id="dUp" ${P.scrap < up ? "disabled" : ""}>强化 +1 级（${up}⚙）</button>${it.rar ? `<button class="btn sm ghost" id="dRr" ${P.scrap < rr ? "disabled" : ""}>重铸词条（${rr}⚙）</button>` : ""}${equipped ? "" : `<button class="btn sm bad" id="dSc">分解 +${YJ.scrapOf(it)}⚙</button>`}</div></div>`;
   const q = s => box.querySelector(s);
   if (q("#dEq")) q("#dEq").onclick = () => { const old = P.eq[it.slot]; P.inv.splice(P.inv.indexOf(it), 1); if (old) P.inv.push(old); P.eq[it.slot] = it; YJ.refreshWeapon(); if (it.slot === "weapon" && G.pl) { G.pl.mag = G.S.mag; } SFX("equip"); panel(root); };

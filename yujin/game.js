@@ -10,11 +10,11 @@ const SFX = (n, v) => { try { YJ.Audio && YJ.Audio.play(n, v); } catch {} };
 
 /* ================= 存档与物品 ================= */
 YJ.newSave = function () {
-  const P = { lv: 1, xp: 0, pts: 0, tal: {}, eq: { weapon: null, armor: null, boots: null, charm: null }, inv: [], scrap: 0, med: 1, chapter: 0, uid: 1, kills: 0 };
+  const P = { lv: 1, xp: 0, pts: 0, tal: {}, eq: { weapon: null, armor: null, boots: null, charm: null }, inv: [], scrap: 0, med: 1, chapter: 0, uid: 1, kills: 0, sv: 5 };
   G.P = P; P.eq.weapon = YJ.makeItem(1, { slot: "weapon", base: "pistol", rar: 0 }); return P;
 };
 YJ.save = () => { try { localStorage.setItem("yj.save", JSON.stringify(G.P)); } catch {} };
-YJ.load = () => { try { const s = JSON.parse(localStorage.getItem("yj.save")); if (s && s.eq && s.eq.weapon) { G.P = s; return s; } } catch {} return null; };
+YJ.load = () => { try { const s = JSON.parse(localStorage.getItem("yj.save")); if (s && s.eq && s.eq.weapon) { if (s.sv !== 5) { for (const it of [...Object.values(s.eq), ...s.inv]) if (it) for (const x of it.aff) { const A = YJ.AFFIX.find(q => q.k === x.k); if (x.k === "hp") x.v = x.v / (1 + .1 * (it.ilvl - 1)); if (A && !A.flat) x.v = Math.min(A.b, Math.max(A.a + (A.b - A.a) * .7, x.v)); } s.sv = 5; } G.P = s; return s; } } catch {} return null; };
 YJ.xpNeed = lv => Math.round(45 + 30 * Math.pow(lv, 1.55));
 function rollRar(m) { return +wpick({ 0: 60, 1: 30 * m, 2: 9 * m * m, 3: 1.5 * m * m }); }
 YJ.makeItem = function (ilvl, o = {}) {
@@ -26,32 +26,36 @@ YJ.makeItem = function (ilvl, o = {}) {
 };
 YJ.rollAffixes = function (it) {
   it.aff = []; it.leg = null;
-  const n = [0, RI(1, 2), RI(3, 4), 4][it.rar], pool = YJ.AFFIX.filter(a => a.s.split(",").includes(it.slot)), q = Math.min(1, (it.ilvl - 1) / 10);
+  const n = [0, 2, 3, 4][it.rar], pool = YJ.AFFIX.filter(a => a.s.split(",").includes(it.slot)); // 词条数量只看稀有度；数值浮动不大，强弱主要由物品等级决定
   for (let i = 0; i < n && pool.length; i++) {
     let s = 0; for (const a of pool) s += a.w; let x = rnd() * s, A = pool[0]; for (const a of pool) { x -= a.w; if (x < 0) { A = a; break; } }
     pool.splice(pool.indexOf(A), 1);
-    let v = A.a + (A.b - A.a) * (rnd() * .6 + q * .4); if (A.grow) v *= 1 + .1 * (it.ilvl - 1);
-    it.aff.push({ k: A.k, v: A.dec ? Math.round(v * 10) / 10 : Math.max(1, Math.round(v)) });
+    it.aff.push({ k: A.k, v: A.flat ? RI(A.a, A.b) : Math.round((A.a + (A.b - A.a) * (.7 + rnd() * .3)) * 100) / 100 });
   }
   if (it.rar === 3) it.leg = pick(Object.keys(YJ.LEG).filter(k => YJ.LEG[k].s === it.slot));
 };
 YJ.itemName = it => (it.leg ? "【" + YJ.LEG[it.leg].n + "】" : "") + (it.slot === "weapon" ? YJ.WEAPONS[it.base].name : YJ.GEAR[it.slot].name);
-YJ.affText = a => YJ.AFFIX.find(x => x.k === a.k).t.replace("{}", a.v);
+const LF = it => 1 + .12 * (it.ilvl - 1);
+YJ.affV = (it, x) => { const A = YJ.AFFIX.find(q => q.k === x.k), v = x.v * (A.flat ? 1 : 1 + (A.grow ? .06 : .03) * (it.ilvl - 1)); return A.dec ? Math.round(v * 10) / 10 : Math.max(1, Math.round(v)); };
+YJ.affText = (a, it) => YJ.AFFIX.find(x => x.k === a.k).t.replace("{}", it ? YJ.affV(it, a) : a.v);
+/* 物品战力：部位基础分 + 每条词条的成色分，再乘物品等级系数。同稀有度下等级越高战力越高 */
+YJ.power = it => { let pts = { weapon: 22, armor: 14, boots: 10, charm: 10 }[it.slot]; for (const x of it.aff) { const A = YJ.AFFIX.find(q => q.k === x.k); pts += 10 * Math.min(1.1, x.v / A.b); } return Math.round(pts * LF(it) * (it.leg ? 1.2 : 1)); };
 YJ.wScale = it => 1 + .13 * (it.ilvl - 1);
-YJ.impOf = it => { const o = {}; if (it.slot !== "weapon") for (const k in YJ.GEAR[it.slot].imp) o[k] = Math.round(YJ.GEAR[it.slot].imp[k] * (k === "hp" ? 1 + .12 * (it.ilvl - 1) : 1 + .04 * (it.ilvl - 1))); return o; };
+YJ.impOf = it => { const o = {}; if (it.slot !== "weapon") for (const k in YJ.GEAR[it.slot].imp) o[k] = Math.round(YJ.GEAR[it.slot].imp[k] * (k === "hp" ? 1 + .12 * (it.ilvl - 1) : 1 + .03 * (it.ilvl - 1))); return o; };
 YJ.scrapOf = it => Math.round((3 + it.ilvl * 1.5) * [1, 2, 5, 14][it.rar]);
-YJ.upCost = it => Math.round(12 * Math.pow(1.32, it.ilvl) * [1, 1.3, 1.8, 2.6][it.rar]);
+YJ.upCost = it => Math.round((14 + it.ilvl * it.ilvl * 1.6) * [1, 1.3, 1.8, 2.6][it.rar]);
 YJ.rerollCost = it => Math.round((10 + it.ilvl * 6) * [0, 1, 2.2, 4][it.rar]);
 /* 汇总属性。alt：假设把某件装备换上去（用来做对比） */
 YJ.calcStats = function (alt) {
   const P = G.P, a = { dmg: 0, rate: 0, crit: 0, critd: 0, hp: 0, regen: 0, ms: 0, armor: 0, lok: 0, pierce: 0, multi: 0, mag: 0, reload: 0, burn: 0, shock: 0, xp: 0, mf: 0, gren: 0, dash: 0 }, legs = {};
   for (const t of YJ.TALENTS) { const n = P.tal[t.k] || 0; for (const k in t.st) a[k] += t.st[k] * n; }
   const eq = { ...P.eq }; if (alt) eq[alt.slot] = alt;
-  for (const s in eq) { const it = eq[s]; if (!it) continue; for (const x of it.aff) a[x.k] += x.v; const im = YJ.impOf(it); for (const k in im) a[k] += im[k]; if (it.leg) legs[it.leg] = 1; }
+  for (const s in eq) { const it = eq[s]; if (!it) continue; for (const x of it.aff) a[x.k] += YJ.affV(it, x); const im = YJ.impOf(it); for (const k in im) a[k] += im[k]; if (it.leg) legs[it.leg] = 1; }
   const w = eq.weapon, B = YJ.WEAPONS[w.base], sc = YJ.wScale(w);
   const S = { a, legs, base: w.base, B, maxhp: Math.round(100 + (P.lv - 1) * 9 + a.hp), dmgM: 1 + a.dmg / 100, rate: B.rate * (1 + a.rate / 100), critC: Math.min(.8, .05 + a.crit / 100), critM: 1.6 + a.critd / 100,
-    msM: 1 + a.ms / 100, armor: Math.min(.7, a.armor / 100), regen: a.regen, lok: a.lok, pierce: B.pierce + a.pierce, pellets: B.pellets + a.multi * (B.pellets > 1 ? 2 : 1), mag: Math.round(B.mag * (1 + a.mag / 100)), reload: B.reload / (1 + a.reload / 100),
+    msM: Math.min(1.6, 1 + a.ms / 100), armor: Math.min(.7, a.armor / 100), regen: a.regen, lok: a.lok, pierce: B.pierce + a.pierce, pellets: B.pellets + a.multi * (B.pellets > 1 ? 2 : 1), mag: Math.round(B.mag * (1 + a.mag / 100)), reload: B.reload / (1 + a.reload / 100),
     burn: a.burn / 100, shock: a.shock / 100, xpM: 1 + a.xp / 100, mfM: 1 + a.mf / 100, grenM: 1 + a.gren / 100, dashCd: 2.6 * (1 - Math.min(.6, a.dash / 100)), wdmg: B.dmg * sc };
+  { const ex = S.pellets - B.pellets; if (ex > 0) S.wdmg *= (B.pellets + ex * .4) / S.pellets; } // 额外弹丸：每多一发总伤害 +40%，不再直接翻倍
   S.dps = Math.round(S.wdmg * S.dmgM * S.pellets * S.rate * (1 + S.critC * (S.critM - 1)));
   if (!alt) G.S = S; return S;
 };
