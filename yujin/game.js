@@ -206,7 +206,7 @@ function blood(L, x, y, n, ang, c) { for (let k = 0; k < n; k++) { const a = ang
 function hurt(L, e, dmg, crit, ang, src) {
   const S = G.S; if (S.legs.fury && G.pl.hp < S.maxhp * .4) dmg *= 1.35;
   e.hp -= dmg; e.flash = .09; e.awake = true; if (!e.E.elite && e.type !== "brute" && e.st === "") e.stag = e.type === "walker" ? .22 : .12;
-  L.nums.push({ x: e.x + R(-6, 6), y: e.y - e.r, v: Math.round(dmg), crit, life: .7 });
+  L.nums.push({ x: e.x + R(-6, 6), y: e.y - e.r - 26, v: Math.round(dmg), crit, life: .7 });
   blood(L, e.x, e.y, crit ? 9 : 4, ang, e.type === "bloater" && rnd() < .5 ? "#4f6a16" : 0);
   if (!e.E.elite) { e.kx += Math.cos(ang) * (crit ? 150 : 70); e.ky += Math.sin(ang) * (crit ? 150 : 70); }
   if (src !== "chain") {
