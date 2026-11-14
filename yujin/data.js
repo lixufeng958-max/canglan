@@ -1,5 +1,5 @@
 /* 余烬·尸潮 — 数据：武器、装备词条、天赋、敌人、关卡、剧情 */
-window.YJ = { TILE: 40, VERSION: "余烬 v7 · 丧尸重画" };
+window.YJ = { TILE: 40, VERSION: "余烬 v8 · 感染者" };
 
 YJ.RAR = [{ n: "普通", c: "#B9B9B9" }, { n: "精良", c: "#4FA3FF" }, { n: "稀有", c: "#FFD23F" }, { n: "传说", c: "#FF7A2F" }];
 YJ.SLOTS = { weapon: "武器", armor: "护甲", boots: "靴子", charm: "饰品" };
