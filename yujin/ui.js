@@ -115,9 +115,12 @@ $("#tHelp").onclick = () => UI.sheet("操作说明", `<div class="help"><p><b>�
 
 /* ================= 安全屋 / 背包 / 天赋 ================= */
 let tab = "bag", sel = null, inSafe = false;
-UI.safe = function () { const P = G.P; if (P.chapter >= YJ.LEVELS.length) return UI.cleared(); inSafe = true; show("sSafe"); G.state = "safe"; YJ.calcStats(); YJ.save(); try { YJ.Audio.mood("safe"); } catch {}
-  const d = YJ.LEVELS[P.chapter]; $("#sfT").textContent = d.name + (P.ng ? "（噩梦 " + P.ng + "）" : ""); $("#sfG").textContent = "目标：" + d.goal; $("#sfGo").hidden = false; panel($("#sfBody")); };
-$("#sfGo").onclick = () => { inSafe = false; show("sGame"); YJ.Render.resize(); YJ.startLevel(G.P.chapter); hudInit(); try { YJ.Audio.mood("play"); } catch {} };
+UI.safe = function (skip) { const P = G.P; if (P.chapter >= YJ.LEVELS.length && !skip) return UI.cleared(); if (P.chapter >= YJ.LEVELS.length) { inSafe = true; show("sSafe"); G.state = "safe"; YJ.calcStats(); YJ.save(); $("#sfT").textContent = "剧情已通关"; $("#sfG").textContent = "可以继续无尽模式，或回菜单进噩梦难度"; $("#sfGo").hidden = true; bestLine(); panel($("#sfBody")); return; } inSafe = true; show("sSafe"); G.state = "safe"; YJ.calcStats(); YJ.save(); try { YJ.Audio.mood("safe"); } catch {}
+  const d = YJ.LEVELS[P.chapter]; $("#sfT").textContent = d.name + (P.ng ? "（噩梦 " + P.ng + "）" : ""); $("#sfG").textContent = "目标：" + d.goal; $("#sfGo").hidden = false; $("#sfG").textContent += "　（" + (P.chapter + 1) + " / " + YJ.LEVELS.length + "）"; bestLine(); panel($("#sfBody")); };
+function bestLine() { const b = G.P.best; $("#sfBest").textContent = b ? "无尽最佳：" + fmtT(b.time) + " · " + b.score + " 分 · 委托 " + b.mis : "无尽模式：一张大地图，没有出口，电台会随机发来委托"; }
+function endlessDone(L) { const P = G.P, b = P.best, r = { time: Math.floor(L.time), score: L.score, mis: L.misN }, isNew = !b || r.score > b.score; if (isNew) P.best = r; YJ.save(); return isNew; }
+const go = i => { inSafe = false; show("sGame"); YJ.Render.resize(); YJ.startLevel(i); hudInit(); try { YJ.Audio.mood("play"); } catch {} };
+$("#sfGo").onclick = () => go(G.P.chapter); $("#sfEnd").onclick = () => go(-1);
 $("#sfBack").onclick = () => UI.title();
 function panel(root) {
   const P = G.P, S = YJ.calcStats();
@@ -162,17 +165,17 @@ UI.sheet = function (title, html, opt = {}) {
 };
 UI.pause = function (toBag) {
   if (G.state !== "play") return; G.state = "pause"; if (toBag) tab = "bag";
-  const sh = UI.sheet("暂停", `<div id="pp"></div><div class="row"><button class="btn sm ghost" id="pAuto">自动瞄准：${YJ.autoAim ? "开" : "关"}</button><button class="btn sm ghost" id="pSnd">声音：${YJ.Audio.on ? "开" : "关"}</button></div><div class="row"><button class="btn" id="pGo">继续战斗</button><button class="btn bad" id="pQuit">放弃本关</button></div>`, { onClose: () => { if (G.state === "pause") G.state = "play"; hudInit(); } });
+  const sh = UI.sheet("暂停", `<div id="pp"></div><div class="row"><button class="btn sm ghost" id="pAuto">自动瞄准：${YJ.autoAim ? "开" : "关"}</button><button class="btn sm ghost" id="pSnd">声音：${YJ.Audio.on ? "开" : "关"}</button></div><div class="row"><button class="btn" id="pGo">继续战斗</button><button class="btn bad" id="pQuit">${G.L.def.endless ? "撤离（结束无尽）" : "放弃本关"}</button></div>`, { onClose: () => { if (G.state === "pause") G.state = "play"; hudInit(); } });
   panel(sh.body.querySelector("#pp"));
   sh.body.querySelector("#pGo").onclick = sh.close;
   sh.body.querySelector("#pAuto").onclick = e => { YJ.autoAim = !YJ.autoAim; try { localStorage.setItem("yj.auto", YJ.autoAim ? "1" : "0"); } catch {} e.target.textContent = "自动瞄准：" + (YJ.autoAim ? "开" : "关"); };
   sh.body.querySelector("#pSnd").onclick = e => { YJ.Audio.set(!YJ.Audio.on); e.target.textContent = "声音：" + (YJ.Audio.on ? "开" : "关"); };
-  sh.body.querySelector("#pQuit").onclick = () => { sh.root.remove(); G.L = null; YJ.save(); UI.safe(); };
+  sh.body.querySelector("#pQuit").onclick = () => { sh.root.remove(); if (G.L && G.L.def.endless) endlessDone(G.L); G.L = null; YJ.save(); UI.safe(1); };
 };
 UI.dead = function () {
-  const L = G.L; YJ.save();
-  const sh = UI.sheet("你倒下了", `<div class="big bad">阵　亡</div><p class="tip" style="text-align:center">${esc(L.def.name)}　击杀 ${L.kills}　用时 ${fmtT(L.time)}<br>已经拾取的装备、经验和零件都会保留。</p><div class="row"><button class="btn" id="dRe">整理装备再战</button><button class="btn ghost" id="dT">回主菜单</button></div>`, { noClose: 1 });
-  sh.body.querySelector("#dRe").onclick = () => { sh.root.remove(); G.L = null; UI.safe(); }; sh.body.querySelector("#dT").onclick = () => { sh.root.remove(); G.L = null; UI.title(); };
+  const L = G.L, rec = L.def.endless ? endlessDone(L) : false; YJ.save();
+  const sh = UI.sheet("你倒下了", `<div class="big bad">阵　亡</div>${L.def.endless ? `<div class="stats"><div><span>存活</span><b>${fmtT(L.time)}</b></div><div><span>得分</span><b>${L.score}${rec ? "（新纪录）" : ""}</b></div><div><span>完成委托</span><b>${L.misN}</b></div><div><span>威胁等级</span><b>${L.lvl - L.base + 1}</b></div></div>` : ""}<p class="tip" style="text-align:center">${esc(L.def.name)}　击杀 ${L.kills}　用时 ${fmtT(L.time)}<br>已经拾取的装备、经验和零件都会保留。</p><div class="row"><button class="btn" id="dRe">整理装备再战</button><button class="btn ghost" id="dT">回主菜单</button></div>`, { noClose: 1 });
+  sh.body.querySelector("#dRe").onclick = () => { sh.root.remove(); G.L = null; UI.safe(1); }; sh.body.querySelector("#dT").onclick = () => { sh.root.remove(); G.L = null; UI.title(); };
 };
 UI.win = function () {
   const L = G.L, P = G.P; P.chapter++; P.med = Math.min(4, P.med + 1); let gift = null; if (P.inv.length < 30) { gift = YJ.makeItem(L.lvl + 2, { rar: Math.random() < .3 ? 2 : 1 }); P.inv.push(gift); } YJ.save();
@@ -181,14 +184,15 @@ UI.win = function () {
 };
 UI.cleared = function () {
   show("sTitle"); G.state = "title"; const P = G.P;
-  const sh = UI.sheet("通关", `<div class="big good">第一部 · 完</div><p class="tip" style="text-align:center">感谢游玩。累计击杀 ${P.kills}，等级 ${P.lv}。<br>可以带着全部装备进入<b>噩梦难度</b>：敌人更强，掉落的装备等级也更高。</p><div class="row"><button class="btn" id="cNg">进入噩梦 ${(P.ng || 0) + 1}</button><button class="btn ghost" id="cT">回主菜单</button></div>`, { noClose: 1 });
-  sh.body.querySelector("#cNg").onclick = () => { sh.root.remove(); P.ng = (P.ng || 0) + 1; P.chapter = 0; YJ.save(); UI.safe(); }; sh.body.querySelector("#cT").onclick = () => { sh.root.remove(); UI.title(); };
+  const sh = UI.sheet("通关", `<div class="big good">第一部 · 完</div><p class="tip" style="text-align:center">感谢游玩。累计击杀 ${P.kills}，等级 ${P.lv}。<br>可以带着全部装备进入<b>噩梦难度</b>：敌人更强，掉落的装备等级也更高。</p><div class="row"><button class="btn" id="cEnd">无尽模式</button><button class="btn" id="cNg">进入噩梦 ${(P.ng || 0) + 1}</button><button class="btn ghost" id="cT">回主菜单</button></div>`, { noClose: 1 });
+  sh.body.querySelector("#cEnd").onclick = () => { sh.root.remove(); UI.safe(1); }; sh.body.querySelector("#cNg").onclick = () => { sh.root.remove(); P.ng = (P.ng || 0) + 1; P.chapter = 0; YJ.save(); UI.safe(); }; sh.body.querySelector("#cT").onclick = () => { sh.root.remove(); UI.title(); };
 };
 const fmtT = s => Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0");
 
 /* ================= HUD ================= */
 let radioQ = [], radioT = 0;
 G.toast = function (text, kind = "") { const b = $("#toasts"); const t = el(`<div class="toast ${kind}"></div>`); t.textContent = text; b.prepend(t); while (b.children.length > 4) b.lastChild.remove(); setTimeout(() => t.remove(), 2600); };
+G.say = function (lines) { radioQ.push(...lines); if (radioT <= 0) radioT = .01; };
 G.radio = function (key) { const L = G.L; if (!L || L.radio[key]) return; L.radio[key] = 1; const lines = L.def.radio[key]; if (lines) { radioQ.push(...lines); if (radioT <= 0) radioT = .01; } };
 function hudInit() { const L = G.L; if (!L) return; $("#hObj").textContent = L.def.goal; radioQ = []; $("#radio").hidden = true; }
 let mmT = 0;
@@ -197,8 +201,8 @@ function hud(dt) {
   $("#hpF").style.width = Math.max(0, pl.hp / S.maxhp * 100) + "%"; $("#hpT").textContent = Math.ceil(pl.hp) + " / " + S.maxhp; $("#xpF").style.width = P.xp / YJ.xpNeed(P.lv) * 100 + "%"; $("#hLv").textContent = "Lv." + P.lv;
   $("#hSc").textContent = "SCORE " + String(L.score).padStart(6, "0"); $("#hpF").parentNode.classList.toggle("low", pl.hp < S.maxhp * .3); $("#hW").textContent = YJ.itemName(P.eq.weapon); $("#hA").textContent = pl.rel > 0 ? "换弹中…" : pl.mag + " / " + S.mag; $("#bMed").dataset.n = P.med; $("#bMed").classList.toggle("off", !P.med);
   const cd = (id, v, max) => { const e = $(id); e.style.setProperty("--cd", Math.max(0, v / max)); e.classList.toggle("off", v > 0); }; cd("#bDash", pl.dashCd, S.dashCd); cd("#bGren", pl.gCd, 6);
-  const o = L.def.obj; $("#hObj").textContent = L.holdOn ? "守住「" + L.def.exitName + "」！开门中 " + Math.min(99, Math.floor(L.holdP / (10 + L.i * 2) * 100)) + "%（别走远）" : L.objDone ? "前往「" + L.def.exitName + "」（小地图上的绿点）" : L.def.goal + (o.n ? "　" + L.objN + "/" + o.n : ""); $("#hObj").classList.toggle("done", L.objDone);
-  const bs = L.bossE && !L.bossE.dead && L.bossE.awake ? L.bossE : L.eliteE && !L.eliteE.dead && L.eliteE.awake ? L.eliteE : null; $("#boss").hidden = !bs; if (bs) { $("#bossF").style.width = bs.hp / bs.maxhp * 100 + "%"; $("#bossN").textContent = bs.E.name; }
+  const o = L.def.obj; if (L.def.endless) { const m = L.mis; $("#hObj").textContent = (m ? m.goal + (m.left ? "（剩 " + m.left + "）" : "") + " · " + Math.round(Math.hypot(m.x - pl.x, m.y - pl.y) / 40) + " 米" : "自由探索 · 等待电台委托") + "　｜威胁 " + (L.lvl - L.base + 1) + " · 委托 " + L.misN + " · " + fmtT(L.time); $("#hObj").classList.toggle("done", !m); } else { $("#hObj").textContent = L.holdOn ? "守住「" + L.def.exitName + "」！开门中 " + Math.min(99, Math.floor(L.holdP / YJ.holdTime(L) * 100)) + "%（别走远）" : L.objDone ? "前往「" + L.def.exitName + "」（小地图上的绿点）" : L.def.goal + (o.n ? "　" + L.objN + "/" + o.n : ""); $("#hObj").classList.toggle("done", L.objDone); }
+  const bs = L.bossE && !L.bossE.dead && L.bossE.awake ? L.bossE : L.eliteE && !L.eliteE.dead && L.eliteE.awake ? L.eliteE : null; $("#boss").hidden = !bs; if (bs) { $("#bossF").style.width = bs.hp / bs.maxhp * 100 + "%"; $("#bossN").textContent = bs.nm || bs.E.name; }
   $("#bBag").classList.toggle("pts", P.pts > 0);
   mmT -= dt; if (mmT <= 0) { mmT = .3; YJ.Render.minimap($("#mm")); }
   if (radioT > 0) { radioT -= dt; if (radioT <= 0) { const l = radioQ.shift(); if (l) { $("#radio").hidden = false; $("#rdW").textContent = l[0]; $("#rdW").style.color = YJ.FACE[l[0]] || "#ccc"; $("#rdT").textContent = l[1]; radioT = 2 + l[1].length * .075; SFX("radio", .5); } else $("#radio").hidden = true; } }
@@ -227,10 +231,11 @@ const tapBtn = (id, fn) => { const b = $(id); b.addEventListener("touchstart", e
 tapBtn("#bDash", () => I.dash = true); tapBtn("#bGren", () => I.gren = true); tapBtn("#bMed", () => I.med = true); tapBtn("#bRel", () => I.reload = true); tapBtn("#bBag", () => UI.pause(true)); tapBtn("#bPause", () => UI.pause());
 
 /* ================= 主循环 ================= */
+const FAST = G.bot ? +(/[?&]fast=(\d+)/.exec(location.search) || [0, 1])[1] : 1;
 let last = performance.now(), titleCv = $("#titleCv");
 function frame(now) {
   const dt = Math.min(.05, (now - last) / 1000); last = now;
-  if (G.state === "play" || G.state === "dead") { readInput(); YJ.update(dt); YJ.Render.draw(now / 1000); hud(dt); try { YJ.Audio.tension(G.L ? G.L.en.filter(e => e.awake).length : 0); } catch {} }
+  if (G.state === "play" || G.state === "dead") { readInput(); YJ.update(dt); for (let k = 1; k < FAST && G.state === "play"; k++) YJ.update(1 / 30); YJ.Render.draw(now / 1000); hud(dt); try { YJ.Audio.tension(G.L ? G.L.en.filter(e => e.awake).length : 0); } catch {} }
   else if (G.state === "pause" || G.state === "won") YJ.Render.draw(now / 1000);
   else if (G.state === "cut" && cut) cutFrame(now);
   else if (G.state === "title" || G.state === "safe") { const cv = G.state === "title" ? titleCv : $("#safeCv"), r = cv.getBoundingClientRect(); if (r.width > 10) { if (cv.width !== Math.round(r.width)) { cv.width = Math.round(r.width); cv.height = Math.round(r.height); } (G.state === "title" ? PAINT.city : PAINT.room)(cv.getContext("2d"), cv.width, cv.height, now / 1000); } }
@@ -239,6 +244,6 @@ function frame(now) {
 addEventListener("resize", () => YJ.Render.resize()); addEventListener("orientationchange", () => setTimeout(() => YJ.Render.resize(), 300));
 document.addEventListener("visibilitychange", () => { if (document.hidden && G.state === "play") UI.pause(); });
 YJ.Render.init(cvs); $("#ver").textContent = YJ.VERSION; UI.title(); requestAnimationFrame(frame);
-if (G.bot) { YJ.newSave(); const m = /[?&]lv=(\d)/.exec(location.search); if (m) { G.P.chapter = +m[1]; G.P.lv = 1 + G.P.chapter * 3; G.P.pts = 0; G.P.eq.weapon = YJ.makeItem(1 + G.P.chapter * 2, { slot: "weapon", base: "rifle", rar: 2 }); } }
+if (G.bot) { YJ.newSave(); const m = /[?&]lv=(\d+)/.exec(location.search); if (m) { G.P.chapter = +m[1]; G.P.lv = 1 + G.P.chapter; G.P.pts = 0; G.P.eq.weapon = YJ.makeItem(1 + G.P.chapter, { slot: "weapon", base: "rifle", rar: 2 }); } }
 if ("serviceWorker" in navigator && location.protocol === "https:") { const had = !!navigator.serviceWorker.controller; navigator.serviceWorker.register("./sw.js").then(reg => document.addEventListener("visibilitychange", () => { if (!document.hidden) reg.update().catch(() => {}); })).catch(() => {}); navigator.serviceWorker.addEventListener("controllerchange", () => { if (had && G.state === "title") location.reload(); }); }
 })();

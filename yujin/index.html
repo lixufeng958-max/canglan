@@ -41,6 +41,7 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;touch-
 #sSafe .in{position:absolute;inset:0;display:flex;flex-direction:column;background:rgba(6,7,9,.82);padding:calc(10px + var(--st)) calc(12px + var(--sr)) calc(10px + var(--sb)) calc(12px + var(--sl))}
 #sSafe header{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 #sSafe header .t{flex:1;min-width:150px}#sfT{font-size:19px;font-weight:800;color:#f3e9d6;letter-spacing:2px}#sfG{font-size:12px;color:var(--amb)}
+.endrow{display:flex;align-items:center;gap:10px;margin-top:8px;padding:7px 10px;border:1px dashed #3a3d43;border-radius:6px;max-width:760px;width:100%;align-self:center}#sfBest{flex:1;font-size:12px;color:#9a9484}#sfEnd{border-color:#7a2a22;color:#ff9a8a;white-space:nowrap}
 #sfBody{flex:1;overflow-y:auto;margin-top:8px;-webkit-overflow-scrolling:touch;max-width:760px;width:100%;align-self:center}
 /* 面板 */
 .tabs{display:flex;gap:6px;position:sticky;top:0;background:#0b0c0f;z-index:2;padding:4px 0}
@@ -147,6 +148,7 @@ button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;touch-
 <div class="screen" id="sCut" hidden><canvas id="cutCv"></canvas><div id="cutBox"><div id="cutWho"></div><div id="cutTxt"></div></div><button id="cutSkip">跳过 ››</button><div id="cutTip">点屏幕继续</div></div>
 <div class="screen" id="sSafe" hidden><canvas id="safeCv"></canvas><div class="in">
   <header><button class="btn sm ghost" id="sfBack">‹ 菜单</button><div class="t"><div id="sfT"></div><div id="sfG"></div></div><button class="btn" id="sfGo">出　发</button></header>
+  <div class="endrow"><span id="sfBest"></span><button class="btn sm ghost" id="sfEnd">无尽模式 ▸</button></div>
   <div id="sfBody"></div></div></div>
 <div class="screen" id="sGame" hidden><canvas id="cv"></canvas>
   <div id="hud">

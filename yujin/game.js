@@ -57,8 +57,10 @@ YJ.calcStats = function (alt) {
 };
 
 /* ================= 地图生成 ================= */
+function endlessDef() { const th = pick(["street", "subway", "hospital", "base", "lab"]);
+  return { name: "无尽 · 废土巡猎", theme: th, act: 4, size: 72, rooms: 22, rw: [7, 11], rh: [6, 9], cw: 3, dens: .06, lvl: Math.max(1, G.P.lv - 1), endless: 1, mix: { walker: 9, runner: 5, crawler: 4, spitter: 3, bloater: 2 }, horde: [26, 6], obj: { t: "endless" }, goal: "活下去，完成电台委托", exitName: "", radio: {} }; }
 function genLevel(i) {
-  const def = YJ.LEVELS[i], W = def.size, H = def.size, g = new Uint8Array(W * H).fill(1), rooms = [];
+  const def = i < 0 ? endlessDef() : YJ.LEVELS[i], W = def.size, H = def.size, g = new Uint8Array(W * H).fill(1), rooms = [];
   const carve = (x0, y0, w, h) => { for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) if (x > 1 && y > 1 && x < W - 2 && y < H - 2) g[y * W + x] = 0; };
   if (def.arena) { const c = W >> 1; rooms.push({ x: c - 4, y: H - 11, w: 8, h: 7 }, { x: c - 13, y: 7, w: 26, h: 21 }, { x: 4, y: 12, w: 7, h: 8 }, { x: W - 11, y: 12, w: 7, h: 8 }); }
   else for (let t = 0; t < 600 && rooms.length < def.rooms; t++) {
@@ -73,8 +75,9 @@ function genLevel(i) {
   else { rooms.sort((a, b) => a.cx + a.cy - b.cx - b.cy);
     for (let k = 1; k < rooms.length; k++) { let best = 0, bd = 1e9; for (let j = 0; j < k; j++) { const d = hyp(rooms[j].cx - rooms[k].cx, rooms[j].cy - rooms[k].cy); if (d < bd) { bd = d; best = j; } } link(rooms[k], rooms[best]); }
     for (let k = 0; k < 2; k++) { const a = pick(rooms), b = rooms.filter(r => r !== a).sort((p, q) => hyp(p.cx - a.cx, p.cy - a.cy) - hyp(q.cx - a.cx, q.cy - a.cy))[1]; if (b) link(a, b); } }
-  const L = { i, def, th: YJ.THEMES[def.theme], W, H, g, rooms, en: [], bul: [], drops: [], fx: [], parts: [], nums: [], objs: [], barrels: [], lamps: [], decals: [], time: 0, kills: 0, objN: 0, objDone: def.obj.t === "exit", hordeT: def.horde[0], hordeN: 0, pools: [], bodies: [], spawnQ: [], score: 0, explored: new Uint8Array(W * H), flow: new Uint16Array(W * H), flowT: 0, radio: {}, loot: 0, lvl: def.lvl + (G.P.ng || 0) * 8 };
-  L.hpM = 1 + .34 * (L.lvl - 1); L.dmgM = 1 + .13 * (L.lvl - 1);
+  const L = { i, def, th: YJ.THEMES[def.theme], W, H, g, rooms, en: [], bul: [], drops: [], fx: [], parts: [], nums: [], objs: [], barrels: [], lamps: [], decals: [], time: 0, kills: 0, objN: 0, objDone: def.obj.t === "exit", hordeT: def.horde[0], hordeN: 0, pools: [], bodies: [], spawnQ: [], score: 0, explored: new Uint8Array(W * H), flow: new Uint16Array(W * H), flowT: 0, radio: {}, loot: 0, lvl: def.lvl + (def.endless ? 0 : (G.P.ng || 0) * 20), misT: 18, misN: 0, mis: null, ambT: 20, base: 0 };
+  L.base = L.lvl;
+  setLvl(L, L.lvl);
   // 从起点量距离：最远的房间放出口
   const start = rooms[0], dist = bfs(L, start.cx, start.cy);
   for (const r of rooms) r.d = dist[r.cy * W + r.cx];
@@ -100,12 +103,13 @@ function genLevel(i) {
   // 目标
   const mid = far.slice(1), o = def.obj;
   if (o.t === "collect" || o.t === "activate") for (let k = 0; k < o.n; k++) { const r = mid[Math.floor((k + .5) * mid.length / o.n)] || far[0], p = { x: (r.cx + .5) * T, y: (r.cy + .5) * T }; L.objs.push({ t: o.t === "collect" ? "fuse" : "gen", x: p.x, y: p.y, prog: 0, done: false, on: false }); }
-  if (o.t === "elite") { const r = far[1] || far[0]; L.eliteE = spawn(L, "elite", (r.cx + .5) * T, (r.cy + .5) * T, false); }
+  if (o.t === "elite") { const r = far[1] || far[0]; L.eliteE = spawn(L, "elite", (r.cx + .5) * T, (r.cy + .5) * T, false); L.eliteE.nm = o.ename; L.eliteE.look = o.look; if (o.look) { L.eliteE.cloth = "#2b3036"; L.eliteE.sumOff = 1; } }
   // 散落的补给：偏僻房间里放几件装备和零件，鼓励探索
   if (!def.arena) for (const r of mid.slice().sort(() => rnd() - .5).slice(0, 4)) { const p = freeIn(r); L.drops.push({ t: "item", it: YJ.makeItem(L.lvl + 1, { rar: Math.max(1, rollRar(1.3)) }), x: p.x, y: p.y, age: 0 }); const q = freeIn(r); L.drops.push({ t: "scrap", n: Math.round(R(4, 8) * (1 + L.lvl * .3)), x: q.x, y: q.y, age: 0 }); }
   if (o.t === "boss") L.bossE = spawn(L, "boss", (rooms[1].cx + .5) * T, (rooms[1].cy - 2 + .5) * T, false);
   return L;
 }
+function setLvl(L, lv) { L.lvl = lv; L.hpM = 1 + .3 * (lv - 1); L.dmgM = 1 + .11 * (lv - 1); }
 function bfs(L, sx, sy, out) {
   const { W, H, g } = L, d = out || new Uint16Array(W * H); d.fill(65535); const q = new Int32Array(W * H); let h = 0, t = 0; d[sy * W + sx] = 0; q[t++] = sy * W + sx;
   while (h < t) { const c = q[h++], x = c % W, nd = d[c] + 1; for (const n of [c - 1, c + 1, c - W, c + W]) { if (n < 0 || n >= W * H || d[n] <= nd || g[n] !== 0) continue; if (Math.abs(n % W - x) > 1) continue; d[n] = nd; q[t++] = n; } }
@@ -170,12 +174,12 @@ function updEnemy(L, e, dt) {
   else if (ai === "spit" && e.see && d < 330) { mv = false; e.ang = Math.atan2(dy, dx); // 站在远处不动，朝玩家脚下吐酸
     if (e.cd <= 0) { e.cd = R(2.4, 3.2); const a = e.ang + R(-.08, .08), dd = Math.min(d, 330), v = 240, life = Math.max(.35, dd / v); L.bul.push({ x: e.x + Math.cos(a) * 14, y: e.y + Math.sin(a) * 14, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life, max: life, dmg: E.dmg * L.dmgM, enemy: 1, acid: 1 }); SFX("spit", .5); } }
   else if (ai === "leap" && e.see && d < 125 && e.cd <= 0 && e.stag <= 0) { tele(e, "leap", .28, Math.atan2(dy, dx)); }
-  else if (ai === "slam" && e.see && d < 92 && e.cd <= 0) { tele(e, "pound", .7, Math.atan2(dy, dx)); }
+  else if ((ai === "slam" || e.look === "brute") && e.see && d < 92 && e.cd <= 0 && e.st === "") { tele(e, "pound", .7, Math.atan2(dy, dx)); }
   else if (ai === "boom" && d < e.r + pl.r + 14) return kill(L, e);
   else if ((ai === "charge" || ai === "boss") && e.see) {
     e.t -= dt;
     if (ai === "charge" && e.t <= 0 && d > 110 && d < 400) { e.t = R(4, 6); tele(e, "charge", .65, Math.atan2(dy, dx)); }
-    if (E.summon) { e.sum -= dt; if (e.sum <= 0) { e.sum = 9; for (let k = 0; k < 4; k++) { const a = rnd() * TAU; if (!blocked(L, e.x + Math.cos(a) * 46, e.y + Math.sin(a) * 46, 12)) spawn(L, "runner", e.x + Math.cos(a) * 46, e.y + Math.sin(a) * 46, true); } SFX("roar", .7); } }
+    if (E.summon && !e.sumOff) { e.sum -= dt; if (e.sum <= 0) { e.sum = 9; for (let k = 0; k < 4; k++) { const a = rnd() * TAU; if (!blocked(L, e.x + Math.cos(a) * 46, e.y + Math.sin(a) * 46, 12)) spawn(L, "runner", e.x + Math.cos(a) * 46, e.y + Math.sin(a) * 46, true); } SFX("roar", .7); } }
     if (ai === "boss" && e.t <= 0) { const p2 = e.hp < e.maxhp * .5; e.t = p2 ? 2.2 : 3.2; const a = ["charge", "volley", "slam", "summon", "volley"][e.n++ % 5];
       if (a === "summon") { for (let k = 0; k < (p2 ? 7 : 5); k++) { const an = rnd() * TAU, x = e.x + Math.cos(an) * 70, y = e.y + Math.sin(an) * 70; if (!blocked(L, x, y, 14)) spawn(L, wpick({ runner: 5, walker: 3, bloater: p2 ? 2 : 0 }), x, y, true); } SFX("roar"); }
       else tele(e, a, a === "slam" ? .95 : a === "charge" ? .6 : .5, Math.atan2(dy, dx)); }
@@ -214,7 +218,7 @@ function hurt(L, e, dmg, crit, ang, src) {
 }
 function kill(L, e) {
   if (e.dead) return; e.dead = true; const S = G.S, pl = G.pl, P = G.P, E = e.E;
-  L.kills++; P.kills++; L.score += Math.round(E.xp * 10 * (1 + (L.lvl - 1) * .1)); gainXp(E.xp * (1 + .2 * (L.lvl - 1)) * S.xpM);
+  L.kills++; P.kills++; if (L.def.obj.t === "purge" && !L.objDone) { L.objN++; if (L.objN === Math.floor(L.def.obj.n / 2)) G.radio("mid"); if (L.objN >= L.def.obj.n) { L.objDone = true; G.radio("done"); SFX("key"); } } L.score += Math.round(E.xp * 10 * (1 + (L.lvl - 1) * .1)); gainXp(E.xp * (1 + .2 * (L.lvl - 1)) * S.xpM);
   pl.hp = Math.min(S.maxhp, pl.hp + S.lok + (S.legs.vamp ? S.maxhp * .03 : 0)); if (S.legs.haste) pl.hasteT = 3;
   blood(L, e.x, e.y, 12, rnd() * TAU);
   if (E.ai === "boom") { explode(L, e.x, e.y, 105, E.dmg * L.dmgM, 1, "#8fbf2a"); addPool(L, e.x, e.y, 46, 5, E.dmg * L.dmgM * .3); // 炸开：酸液、碎肉，波及周围丧尸
@@ -230,7 +234,7 @@ function kill(L, e) {
   if (E.elite) for (let k = 0; k < 3; k++) drop(L, e.x, e.y, { t: "item", it: YJ.makeItem(il) });
   if (rnd() < (E.elite ? 1 : .03)) drop(L, e.x, e.y, { t: "med" });
   if (rnd() < .28 || E.elite) drop(L, e.x, e.y, { t: "scrap", n: Math.round(R(1, 3) * (E.elite ? 15 : 1) * (1 + L.lvl * .3)) });
-  if (e === L.eliteE) { L.objDone = true; G.radio("done"); G.toast("取得门禁卡"); SFX("key"); }
+  if (e === L.eliteE && !L.def.endless) { L.objDone = true; G.radio("done"); G.toast("取得" + (L.def.obj.name || "门禁卡"), "gold"); SFX("key"); }
   if (e === L.bossE) { L.objDone = true; G.slow = .25; setTimeout(() => G.slow = 1, 1600); G.radio("done"); G.shake = 30; for (const o of L.en) if (o !== e) o.hp = 0; }
 }
 function drop(L, x, y, o) { const a = rnd() * TAU, d = R(8, 26); let nx = x + Math.cos(a) * d, ny = y + Math.sin(a) * d; if (blocked(L, nx, ny, 8)) { nx = x; ny = y; } L.drops.push({ ...o, x: nx, y: ny, age: 0 }); }
@@ -272,7 +276,7 @@ function updPlayer(L, dt) {
   let mx = I.mx, my = I.my; const ml = hyp(mx, my); if (ml > 1) { mx /= ml; my /= ml; }
   if (I.dash && pl.dashCd <= 0 && pl.dashT <= 0) { pl.dashT = .28; pl.dashCd = S.dashCd; const a = ml > .2 ? Math.atan2(my, mx) : pl.ang; pl.dx = Math.cos(a); pl.dy = Math.sin(a); SFX("dash"); }
   I.dash = false;
-  if (pl.dashT > 0) { pl.dashT -= dt; move(L, pl, pl.dx * 430 * dt, pl.dy * 430 * dt); if (rnd() < .6) part(L, pl.x, pl.y, 0, 0, .25, "rgba(200,220,255,.5)", 9); }
+  if (pl.dashT > 0) { pl.dashT -= dt; move(L, pl, pl.dx * 430 * dt, pl.dy * 430 * dt); if (rnd() < .6) part(L, pl.x, pl.y, 0, 0, .3, "#8a9a94", 7, 0, "smoke"); }
   else { const sp = 172 * S.msM * (pl.hasteT > 0 ? 1.25 : 1) * (I.fire && !S.B.flame ? .86 : 1); move(L, pl, mx * sp * dt, my * sp * dt); if (ml > .1) pl.walk += dt * 11; }
   for (const b of L.barrels) { if (b.dead) continue; const d = hyp(pl.x - b.x, pl.y - b.y); if (d < pl.r + b.r && d > 0) move(L, pl, (pl.x - b.x) / d * (pl.r + b.r - d), (pl.y - b.y) / d * (pl.r + b.r - d)); }
   // 瞄准：有瞄准输入用输入；触屏没输入时自动瞄最近的可见敌人
@@ -297,7 +301,9 @@ function updPlayer(L, dt) {
 /* 测试用自动驾驶：沿寻路走向当前目标，见敌就打，太近就后撤 */
 function autopilot(L) {
   const pl = G.pl, I = G.inp; let tgt = null, bd = 1e9; for (const e of L.en) { if (!e.see) continue; const d = hyp(e.x - pl.x, e.y - pl.y); if (d < bd) { bd = d; tgt = e; } }
-  let goal = L.exit; if (!L.objDone) { const o = L.objs.filter(o => !o.done).sort((a, b) => hyp(a.x - pl.x, a.y - pl.y) - hyp(b.x - pl.x, b.y - pl.y))[0]; goal = o || L.eliteE || L.bossE || L.exit; }
+  let goal = L.exit; if (!L.objDone) { const o = L.objs.filter(o => !o.done).sort((a, b) => hyp(a.x - pl.x, a.y - pl.y) - hyp(b.x - pl.x, b.y - pl.y))[0]; goal = o || L.eliteE || L.bossE; if (L.def.endless && L.mis) goal = L.mis.es && L.mis.es[0] ? L.mis.es[0] : L.mis;
+    if (!goal && (L.def.obj.t === "purge" || L.def.endless)) { let bd2 = 1e12; for (const e of L.en) { const d2 = (e.x - pl.x) ** 2 + (e.y - pl.y) ** 2; if (d2 < bd2) { bd2 = d2; goal = e; } } }
+    goal = goal || L.exit; }
   const gk = Math.floor(goal.x / T) + "," + Math.floor(goal.y / T); if (L.botK !== gk || !L.botD) { L.botK = gk; L.botD = bfs(L, Math.floor(goal.x / T), Math.floor(goal.y / T)); }
   const cx = Math.floor(pl.x / T), cy = Math.floor(pl.y / T), W = L.W; let best = L.botD[cy * W + cx], bx = 0, by = 0;
   for (const [ox, oy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const v = L.botD[(cy + oy) * W + cx + ox]; if (v < best) { best = v; bx = ox; by = oy; } }
@@ -332,11 +338,38 @@ function updBullets(L, dt) {
   for (const b of L.barrels) if (!b.dead && b.hp <= 0) { b.dead = true; explode(L, b.x, b.y, 105, 90 * L.hpM, 1); }
 }
 
+/* ================= 无尽模式：威胁随时间上升，电台随机发委托 ================= */
+function farRoom(L, min) { const pl = G.pl, c = L.rooms.filter(r => { const d = L.flow[r.cy * L.W + r.cx]; return d >= min && d < 60000; }); return c.length ? pick(c) : L.rooms.slice().sort((a, b) => L.flow[b.cy * L.W + b.cx] - L.flow[a.cy * L.W + a.cx])[0]; }
+function newMission(L) {
+  const pl = G.pl, type = pick(["supply", "beacon", "hunt", "nest", "supply", "hunt"]), M = YJ.MISSIONS[type], r = farRoom(L, 22), x = (r.cx + .5) * T, y = (r.cy + .5) * T;
+  const a = Math.atan2(y - pl.y, x - pl.x), dir = ["东", "东南", "南", "西南", "西", "西北", "北", "东北"][((Math.round(a / (Math.PI / 4)) % 8) + 8) % 8];
+  const m = L.mis = { type, name: M.name, goal: M.goal, x, y, t: 0 };
+  if (type === "supply") { m.ob = { t: "fuse", x, y, prog: 0, done: false, on: false }; L.objs.push(m.ob); for (let k = 0; k < 6; k++) { const p = L.freeIn(r); spawn(L, wpick(L.def.mix), p.x, p.y, false); } }
+  else if (type === "beacon") { m.ob = { t: "gen", x, y, prog: 0, done: false, on: false }; L.objs.push(m.ob); }
+  else if (type === "hunt") { const e = m.e = L.eliteE = spawn(L, "elite", x, y, false); e.nm = pick(YJ.ELITE_NAMES); e.look = "brute"; e.cloth = "#2b3036"; e.sumOff = 1; e.hp = e.maxhp = e.hp * .55; }
+  else { m.es = []; for (let k = 0; k < 14 + L.misN * 2; k++) { const p = L.freeIn(r), e = spawn(L, wpick({ ...L.def.mix, brute: L.misN > 2 ? 1 : 0 }), p.x, p.y, false); m.es.push(e); } }
+  G.say(pick(M.lines).map(l => [l[0], l[1].replace("{p}", dir)])); G.toast("新委托：" + M.name, "gold"); SFX("key", .7);
+}
+function updEndless(L, dt) {
+  const pl = G.pl, P = G.P, m = L.mis;
+  const lv = L.base + Math.floor(L.time / 75) + L.misN; if (lv !== L.lvl) { setLvl(L, lv); G.toast("威胁等级上升 → " + (lv - L.base + 1), "red"); if ((lv - L.base) % 3 === 0) L.def.mix = { ...L.def.mix, brute: (L.def.mix.brute || 0) + 1, runner: L.def.mix.runner + 1 }; }
+  L.ambT -= dt; if (L.ambT <= 0 && L.en.length < 70) { L.ambT = 14; const r = farRoom(L, 16); for (let k = 0; k < 7; k++) { const p = L.freeIn(r); spawn(L, wpick(L.def.mix), p.x, p.y, false); } }
+  if (!m) { L.misT -= dt; if (L.misT <= 0) newMission(L); return; }
+  m.t += dt; let done = false; const d = hyp(m.x - pl.x, m.y - pl.y);
+  if (m.type === "supply") { if (d < 30) { m.ob.done = true; done = true; } }
+  else if (m.type === "beacon") { const ob = m.ob; if (d < 66) { if (!ob.on) { ob.on = true; horde(L, 9 + L.misN * 2, L.def.mix); G.toast("信标启动中，守住！", "gold"); SFX("gen"); } ob.prog += dt / 8; if (rnd() < dt * 1.3) horde(L, 2, L.def.mix); if (ob.prog >= 1) { ob.done = true; done = true; L.lamps.push({ x: ob.x, y: ob.y, r: 240, c: "#9effa0", f: 0 }); } } }
+  else if (m.type === "hunt") { if (m.e.dead) { done = true; L.eliteE = null; } else { m.x = m.e.x; m.y = m.e.y; } }
+  else { m.es = m.es.filter(e => !e.dead); m.left = m.es.length; if (!m.es.length) done = true; }
+  if (done) { L.mis = null; L.misN++; L.misT = R(14, 22); L.score += 800 + L.misN * 200; SFX("win", .6); G.toast("委托完成！奖励已投放", "gold");
+    drop(L, pl.x, pl.y, { t: "item", it: YJ.makeItem(L.lvl + 1, { rar: Math.max(L.misN % 4 === 0 ? 3 : 1, rollRar(1.6)) }) }); drop(L, pl.x, pl.y, { t: "scrap", n: 12 + L.lvl * 3 }); if (P.med < 4) drop(L, pl.x, pl.y, { t: "med" });
+    G.say([[pick(["林夏", "林夏", "老周"]), pick(["干得漂亮。歇口气，下一个委托很快就来。", "收到。灯塔记你一功。", "你比军队管用多了。", "活着就好。别走远，频道里又有人在喊。"])]]); }
+}
+
 /* ================= 主循环 ================= */
 YJ.startLevel = function (i) {
   const L = G.L = genLevel(i); YJ.calcStats();
   G.pl = { x: L.start.x, y: L.start.y, r: 12, ang: 0, hp: G.S.maxhp, fireCd: 0, mag: G.S.mag, rel: 0, relMax: 1, dashT: 0, dashCd: 0, gCd: 0, inv: 1, hurtT: 0, walk: 0, va: 0, mvx: 0, mvy: 0, hasteT: 0, flashT: 0, novaCd: 0, medCd: 0 };
-  G.cam = { x: L.start.x, y: L.start.y, lx: 0, ly: 0 }; G.state = "play"; G.slow = 1; G.shake = 0; G.inp.mx = G.inp.my = G.inp.ax = G.inp.ay = 0; G.inp.fire = false;
+  G.cam = { x: L.start.x, y: L.start.y, lx: 0, ly: 0 }; G.state = "play"; if (L.def.endless) setTimeout(() => G.say([["林夏", "这片区域没有出口，也没有尽头。活下去，频道里有人求救我就转给你。"]]), 600); G.slow = 1; G.shake = 0; G.inp.mx = G.inp.my = G.inp.ax = G.inp.ay = 0; G.inp.fire = false;
   YJ.Render.build(L); setTimeout(() => G.radio("start"), 600);
 };
 YJ.refreshWeapon = function () { YJ.calcStats(); if (G.pl) { G.pl.mag = Math.min(G.pl.mag, G.S.mag); G.pl.hp = Math.min(G.pl.hp, G.S.maxhp); } };
@@ -371,16 +404,18 @@ YJ.update = function (dtReal) {
       L.drops.splice(i, 1); } }
   // 目标
   const o = L.def.obj;
-  for (const ob of L.objs) { if (ob.done) continue; const d = hyp(ob.x - pl.x, ob.y - pl.y);
+  if (L.def.endless) updEndless(L, dt);
+  else for (const ob of L.objs) { if (ob.done) continue; const d = hyp(ob.x - pl.x, ob.y - pl.y);
     if (ob.t === "fuse" && d < 30) { ob.done = true; L.objN++; SFX("key"); G.toast(o.name + " " + L.objN + "/" + o.n, "gold"); if (L.objN === 2) G.radio("mid"); }
-    if (ob.t === "gen") { if (d < 62) { if (!ob.on) { ob.on = true; horde(L, 7 + L.objN * 3, { walker: 5, runner: 5, bloater: 2 }); G.toast("发电机启动中，守住！", "gold"); SFX("gen"); } ob.prog += dt / 5; if (rnd() < dt * 1.2) horde(L, 2); if (ob.prog >= 1) { ob.done = true; L.objN++; SFX("key"); G.toast(o.name + " " + L.objN + "/" + o.n, "gold"); L.lamps.push({ x: ob.x, y: ob.y, r: 240, c: "#9effa0", f: 0 }); if (L.objN === 2) G.radio("mid"); } } }
+    if (ob.t === "gen") { if (d < 62) { if (!ob.on) { ob.on = true; horde(L, 7 + L.objN * 3, { walker: 5, runner: 5, bloater: 2 }); G.toast("发电机启动中，守住！", "gold"); SFX("gen"); } ob.prog += dt / 8; if (rnd() < dt * 1.2) horde(L, 2); if (ob.prog >= 1) { ob.done = true; L.objN++; SFX("key"); G.toast(o.name + " " + L.objN + "/" + o.n, "gold"); L.lamps.push({ x: ob.x, y: ob.y, r: 240, c: "#9effa0", f: 0 }); if (L.objN === 2) G.radio("mid"); } } }
     if (L.objN >= o.n && !L.objDone) { L.objDone = true; G.radio("done"); } }
   // 尸潮
   if (L.def.horde[0]) { L.hordeT -= dt; if (L.hordeT <= 0 && L.en.length < 90) { L.hordeT = L.def.horde[0] * R(.8, 1.2); L.hordeN++; horde(L, L.def.horde[1] + L.hordeN, L.def.mix); if (L.hordeN === 1 && o.t !== "collect" && o.t !== "activate") G.radio("mid"); G.toast("尸群正在逼近……", "red"); } }
-  if (L.objDone && !L.won) { const near = hyp(L.exit.x - pl.x, L.exit.y - pl.y) < 80, hold = L.def.arena ? 0 : 10 + L.i * 2;
-    if (near && hold && !L.holdOn) { L.holdOn = true; L.holdP = 0; G.toast("正在开门——守住！", "red"); SFX("horde", .8); horde(L, 8 + L.i * 3, L.def.mix); L.holdW = 5; }
-    if (L.holdOn && near) { L.holdP += dt; L.holdW -= dt; if (L.holdW <= 0 && L.en.length < 90) { L.holdW = 5; horde(L, 4 + L.i * 2, L.def.mix); } }
+  if (L.objDone && !L.won) { const near = hyp(L.exit.x - pl.x, L.exit.y - pl.y) < 80, hold = L.def.arena ? 0 : YJ.holdTime(L);
+    if (near && hold && !L.holdOn) { L.holdOn = true; L.holdP = 0; G.toast("正在开门——守住！", "red"); SFX("horde", .8); horde(L, Math.min(26, 8 + L.i * 2), L.def.mix); L.holdW = 5; }
+    if (L.holdOn && near) { L.holdP += dt; L.holdW -= dt; if (L.holdW <= 0 && L.en.length < 90) { L.holdW = 5; horde(L, Math.min(14, 4 + L.i), L.def.mix); } }
     if (near && (!hold || L.holdP >= hold) && hyp(L.exit.x - pl.x, L.exit.y - pl.y) < (hold ? 80 : 34)) { L.won = true; G.state = "won"; SFX("win"); YJ.UI.win(); } }
 };
+YJ.holdTime = L => Math.min(30, 12 + L.i);
 YJ.reloadNow = () => { G.inp.reload = true; };
 })();
