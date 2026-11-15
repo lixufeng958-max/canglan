@@ -1,5 +1,5 @@
 /* 余烬·尸潮 — 数据：武器、装备词条、天赋、敌人、关卡、剧情 */
-window.YJ = { TILE: 40, VERSION: "余烬 v8 · 感染者" };
+window.YJ = { TILE: 40, VERSION: "余烬 v9 · 贴图角色" };
 
 YJ.RAR = [{ n: "普通", c: "#B9B9B9" }, { n: "精良", c: "#4FA3FF" }, { n: "稀有", c: "#FFD23F" }, { n: "传说", c: "#FF7A2F" }];
 YJ.SLOTS = { weapon: "武器", armor: "护甲", boots: "靴子", charm: "饰品" };
@@ -67,14 +67,15 @@ YJ.TALENTS = [
 
 /* 敌人 */
 YJ.ENEMY = {
-  walker:  { name: "行尸", hp: 44, sp: 50, dmg: 10, r: 13, xp: 6, skin: "#6c7b68", cloth: ["#4a5258", "#544a42", "#3f4a3c", "#4d4a5c", "#5a5248"] },
-  runner:  { name: "疯跑者", hp: 24, sp: 158, dmg: 8, r: 10, xp: 8, skin: "#98987f", cloth: ["#5a3530", "#34424e", "#3d3d36"] },
-  crawler: { name: "爬行者", hp: 30, sp: 46, dmg: 14, r: 10, xp: 8, skin: "#5f6b5c", cloth: ["#30363a", "#3a322c"], ai: "leap" },
-  spitter: { name: "喷吐者", hp: 40, sp: 40, dmg: 13, r: 13, xp: 11, skin: "#a3aa4c", cloth: ["#4a5230"], ai: "spit" },
-  bloater: { name: "肥尸", hp: 150, sp: 38, dmg: 30, r: 24, xp: 16, skin: "#7f9a48", cloth: ["#4c4a34"], ai: "boom" },
-  brute:   { name: "巨尸", hp: 420, sp: 56, dmg: 28, r: 27, xp: 50, skin: "#6a7566", cloth: ["#2b3036", "#343a2c"], ai: "slam" },
-  elite:   { name: "护士长", hp: 1500, sp: 70, dmg: 28, r: 25, xp: 220, skin: "#9aa89c", cloth: ["#b9c4be"], ai: "charge", elite: 1, summon: 1 },
-  boss:    { name: "零号", hp: 6800, sp: 78, dmg: 30, r: 36, xp: 800, skin: "#75687f", cloth: ["#c9c9cf"], ai: "boss", elite: 1 }
+  /* 速度/血量/伤害/攻击间隔按 movement-logic.md；atkI = 攻击后的硬直（秒） */
+  walker:  { name: "行尸", hp: 100, sp: 55, dmg: 12, atkI: .8, r: 13, xp: 6, skin: "#7c8a76", cloth: ["#4a5258"] },
+  runner:  { name: "疯跑者", hp: 60, sp: 150, dmg: 8, atkI: .5, r: 11, xp: 8, skin: "#98987f", cloth: ["#5a3530"] },
+  crawler: { name: "爬行者", hp: 50, sp: 75, dmg: 10, atkI: .6, r: 9, xp: 8, skin: "#5f6b5c", cloth: ["#30363a"], ai: "leap" },
+  spitter: { name: "喷吐者", hp: 80, sp: 40, dmg: 13, atkI: .8, r: 13, xp: 11, skin: "#a3aa4c", cloth: ["#4a5230"], ai: "spit" },
+  bloater: { name: "肥尸", hp: 220, sp: 35, dmg: 20, atkI: 1.2, r: 22, xp: 16, skin: "#7f9a48", cloth: ["#4c4a34"], ai: "boom" },
+  brute:   { name: "巨尸", hp: 600, sp: 56, dmg: 28, atkI: 1.2, r: 27, xp: 50, skin: "#6a7566", cloth: ["#2b3036"], ai: "slam" },
+  elite:   { name: "护士长", hp: 2200, sp: 70, dmg: 28, atkI: 1, r: 27, xp: 220, skin: "#9aa89c", cloth: ["#b9c4be"], ai: "charge", elite: 1, summon: 1 },
+  boss:    { name: "零号", hp: 9000, sp: 78, dmg: 30, atkI: 1, r: 36, xp: 800, skin: "#75687f", cloth: ["#c9c9cf"], ai: "boss", elite: 1 }
 };
 
 /* 关卡主题：地面/墙面颜色、黑暗程度、环境 */
@@ -90,7 +91,7 @@ YJ.THEMES = {
    每行：[名字, 主题, 目标, 目标说明, 出口名, 开场电台, 中途电台, 完成电台] */
 (function () {
   const TH = { street: { rw: [8, 12], rh: [7, 10], cw: 3 }, subway: { rw: [6, 10], rh: [5, 8], cw: 2 }, hospital: { rw: [6, 10], rh: [5, 9], cw: 2 }, base: { rw: [7, 11], rh: [6, 9], cw: 3 }, lab: { rw: [7, 10], rh: [6, 9], cw: 3 } };
-  const MIX = [{ walker: 10, runner: 2, crawler: 2 }, { walker: 8, runner: 4, crawler: 4, spitter: 3 }, { walker: 8, runner: 5, crawler: 4, spitter: 3, bloater: 2 }, { walker: 8, runner: 6, crawler: 4, spitter: 3, bloater: 2, brute: 1 }, { walker: 6, runner: 7, crawler: 5, spitter: 4, bloater: 3, brute: 2 }];
+  const MIX = [{ walker: 10, runner: 2 }, { walker: 8, runner: 4, spitter: 3 }, { walker: 8, runner: 5, spitter: 3, bloater: 2 }, { walker: 8, runner: 6, spitter: 3, bloater: 2, brute: 1 }, { walker: 6, runner: 7, spitter: 4, bloater: 3, brute: 2 }]; // 爬行者暂无贴图，先不出场
   const ACT = { street: 0, subway: 1, hospital: 2, base: 3, lab: 4 }, N = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二", "十三", "十四", "十五", "十六", "十七", "十八", "十九", "二十", "二十一"];
   const ROWS = [
     ["灰烬街区", "street", { t: "exit" }, "穿过老城区，找到通往封锁线的路口", "封锁线路口",

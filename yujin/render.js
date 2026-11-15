@@ -355,7 +355,75 @@ function gait(o, cyc, hold) { const mv = Math.hypot(o.x - (o._lx === undefined ?
 /* 影子：椭圆，朝背光方向偏移拉长；身体起伏时略微缩放 */
 function shadow(c, x, y, r, ang, k, sm) { c.save(); c.translate(x + Math.cos(ang) * r * .7 * k, y + Math.sin(ang) * r * .7 * k); c.rotate(ang); c.fillStyle = "rgba(0,0,0,.5)"; c.beginPath(); c.ellipse(0, 0, r * (.85 + .6 * k) * sm, r * .5 * sm, 0, 0, TAU); c.fill(); c.restore(); }
 Rn.figure = figure;
+/* ---------- PNG 贴图角色（素材包 sprites_pack）----------
+   每个角色：整图 full（待机）+ 头 / 身体 / 左腿 / 右腿 四个拆件。走路 = 两条腿绕髋关节反向摆动 + 身体起伏。
+   坐标都是原图像素（见 movement-logic.md），H 是在游戏里的身高（世界像素），cyc 是一个走路周期走过的距离 = 周期秒数 × 速度 */
+const SPRD = {
+  hero:    { f: "hero", w: 1017, h: 1489, head: 279, tTop: 249, tH: 610, lTop: 789, split: 483, ax: 400, H: 64, swing: 15, cyc: .62 * 220, bob: 2.2 },
+  walker:  { f: "zombie_ordinary", w: 1120, h: 1960, head: 392, tTop: 333, tH: 843, lTop: 1078, split: 560, ax: 560, H: 70, swing: 12, cyc: .85 * 55, bob: 1.6, sway: .035 },
+  runner:  { f: "zombie_runner", w: 1477, h: 1379, head: 275, tTop: 234, tH: 593, lTop: 758, split: 738, ax: 770, H: 58, swing: 20, cyc: .45 * 150, bob: 2.2, face: -1 },
+  bloater: { f: "zombie_bloater", w: 1327, h: 1550, head: 310, tTop: 263, tH: 667, lTop: 852, split: 663, ax: 663, H: 84, swing: 6, fill: 1, cyc: 1.0 * 35, bob: 1.4, sway: .03 }
+};
+/* 暂时没有专属贴图的种类：借用现有贴图换色、放大（等素材补齐后替换） */
+for (const [k, base, tint, H, cyc] of [["spitter", "walker", "#bcdc8c", 68, .9 * 40], ["crawler", "walker", "#8a9088", 50, .7 * 75], ["brute", "bloater", "#8a93a0", 104, 1.0 * 56], ["elite", "bloater", "#e6e6e6", 108, 1.0 * 70], ["elite2", "bloater", "#c06a5a", 108, 1.0 * 70], ["boss", "bloater", "#b48ad8", 138, 1.0 * 78]]) SPRD[k] = { ...SPRD[base], base, tint, H, cyc };
+const SPR = { ok: false, n: 0 };
+(function loadSprites() { const parts = ["full", "head", "torso", "leg_l", "leg_r"], bases = Object.keys(SPRD).filter(k => !SPRD[k].base); let left = bases.length * parts.length;
+  for (const k of bases) { const D = SPRD[k]; D.img = {}; for (const p of parts) { const im = new Image(); im.onload = () => { if (--left === 0) { for (const q in SPRD) { const E = SPRD[q]; if (!E.base) continue; E.img = {}; for (const p2 of parts) { const src = SPRD[E.base].img[p2], cv = document.createElement("canvas"); cv.width = src.naturalWidth; cv.height = src.naturalHeight; const g = cv.getContext("2d"); g.drawImage(src, 0, 0); g.globalCompositeOperation = "multiply"; g.fillStyle = E.tint; g.fillRect(0, 0, cv.width, cv.height); g.globalCompositeOperation = "destination-in"; g.drawImage(src, 0, 0); E.img[p2] = cv; } } SPR.ok = true; } }; im.onerror = () => { SPR.failed = true; }; im.src = "spr/" + D.f + "_" + p + ".png"; D.img[p] = im; } } })();
+/* 画一个贴图角色。x,y = 脚下的地面位置。o：ph 走路相位(0–1) / walk 是否在走 / flip 左右翻转 / t 时间 / rot 整体绕脚底旋转 / tors 上半身转动(主角瞄准) / lean 后仰 / alpha / white 闪白 / k 额外缩放 */
+function drawSpr(c, key, x, y, o) {
+  const D = SPRD[key], I = D.img, s = D.H / D.h * (o.k || 1), TW = TAU; c.save(); c.translate(x, y); if (o.flip) c.scale(-1, 1); if (o.rot) c.rotate(o.rot); c.scale(s, s); if (o.alpha != null) c.globalAlpha = o.alpha;
+  const body = () => { c.translate(-D.ax, -(D.h - 14));
+    if (!o.walk && !o.tors && !o.lean) { const br = 1 + .007 * Math.sin((o.t || 0) * Math.PI); c.translate(0, D.h); c.scale(1, br); c.translate(0, -D.h); c.drawImage(I.full, 0, 0, D.w, D.h); return; } // 待机：整图 + 呼吸起伏
+    const ph = o.walk ? o.ph : 0, a = o.walk ? D.swing * Math.PI / 180 * Math.sin(TW * ph) : 0, bobS = D.bob / (D.H / D.h), bob = o.walk ? bobS * (.5 - .5 * Math.cos(2 * TW * ph)) : bobS * .5 * (.5 + .5 * Math.sin((o.t || 0) * Math.PI)), lh = D.h - D.lTop, lift = 14 / D.swing * 15;
+    if (D.fill) { c.drawImage(I.leg_l, 0, D.lTop, D.split, lh); c.drawImage(I.leg_r, D.split, D.lTop, D.w - D.split, lh); } // 拆件切到了肚子：先垫一层不动的，摆腿时中间不裂缝
+    c.save(); c.translate(D.split / 2, D.lTop); c.rotate(a); c.drawImage(I.leg_l, -D.split / 2, -lift * Math.max(0, -Math.sin(TW * ph)) * (o.walk ? 1 : 0), D.split, lh); c.restore(); // 左腿绕髋关节摆
+    const rw = D.w - D.split; c.save(); c.translate(D.split + rw / 2, D.lTop); c.rotate(-a); c.drawImage(I.leg_r, -rw / 2, -lift * Math.max(0, Math.sin(TW * ph)) * (o.walk ? 1 : 0), rw, lh); c.restore(); // 右腿反向
+    c.translate(0, bob); if (o.walk && D.sway) { c.translate(D.ax, D.lTop); c.rotate(D.sway * Math.sin(TW * ph)); c.translate(-D.ax, -D.lTop); } // 身体起伏：腿摆到最大时身体最低；丧尸还会左右晃
+    if (o.tors || o.lean) { c.translate(D.ax, D.lTop); c.rotate((o.tors || 0) + (o.lean || 0)); c.translate(-D.ax, -D.lTop); }
+    c.drawImage(I.torso, 0, D.tTop, D.w, D.tH); c.drawImage(I.head, 0, 0, D.w, D.head); };
+  c.save(); body(); c.restore();
+  if (o.white) { c.globalCompositeOperation = "lighter"; c.globalAlpha = (o.alpha == null ? 1 : o.alpha) * o.white; c.save(); body(); c.restore(); c.save(); body(); c.restore(); c.globalCompositeOperation = "source-over"; }
+  c.restore();
+}
+function sprShadow(c, x, y, w, a) { const g = c.createRadialGradient(x, y, 0, x, y, w); g.addColorStop(0, `rgba(0,0,0,${.5 * a})`); g.addColorStop(.6, `rgba(0,0,0,${.3 * a})`); g.addColorStop(1, "rgba(0,0,0,0)"); c.save(); c.translate(x, y); c.scale(1, .42); c.translate(-x, -y); c.fillStyle = g; c.beginPath(); c.arc(x, y, w, 0, TAU); c.fill(); c.restore(); }
+const FOOT = 5; // 脚底比实体中心略靠下
+function drawPlayerSpr(c, pl, S, time) {
+  const D = SPRD.hero, dead = G.state === "dead"; if (dead) pl.deadT = pl.deadT === undefined ? time : pl.deadT; else pl.deadT = undefined;
+  const dk = dead ? Math.min(6, Math.ceil((time - pl.deadT) / .1 + .01)) / 6 : 0, roll = pl.dashT > 0, still = gait(pl, D.cyc * (roll ? .5 : 1), dead), walk = !still && !dead; // 翻滚时腿摆快一倍
+  const flip = Math.cos(pl.va) < 0, aa = flip ? Math.PI - pl.va : pl.va, an = ((aa % TAU) + TAU + Math.PI) % TAU - Math.PI, tors = dead ? 0 : Math.max(-.75, Math.min(.6, an - .5)) + (pl.flashT > 0 && !S.B.flame ? -.03 : 0); // 上半身带着枪转向瞄准方向（贴图只有一个朝向，转动范围有限）
+  const hit = pl.hurtT > .2 ? 1 : pl.hurtT > .08 ? .5 : 0, sgn = flip ? -1 : 1, fy = pl.y + FOOT;
+  if (dead) { c.fillStyle = "rgba(70,6,6,.85)"; el(c, pl.x - sgn * 22 * dk, fy - 2, 30 * dk, 15 * dk, 0); el(c, pl.x - sgn * 40 * dk, fy + 5, 13 * dk, 7 * dk, 1); } // 血泊扩散
+  sprShadow(c, pl.x - sgn * 26 * dk, fy, 20, 1);
+  const rec = pl.flashT > 0 && !S.B.flame ? 2 : 0; // 开枪后坐 2px
+  drawSpr(c, "hero", pl.x - Math.cos(pl.va) * rec, fy - Math.sin(pl.va) * rec * .5, { ph: pl.gp || 0, walk, flip, t: time, tors, lean: -hit * .14, rot: -dk * Math.PI / 2, white: hit === 1 ? .55 : 0, k: roll ? .92 : 1 });
+  // 枪口位置：随上半身一起转
+  const s = D.H / D.h, px = (1003 - D.ax) * s, py = (681 - D.lTop) * s, ct = Math.cos(tors), st = Math.sin(tors), mx = (px * ct - py * st) * sgn, my = (px * st + py * ct) - (D.h - 14 - D.lTop) * s, ga = flip ? Math.PI - (tors + .5) : tors + .5;
+  Rn.muz = { x: pl.x + mx, y: fy + my, a: ga };
+  if (pl.flashT > 0 && !S.B.flame && !dead) { c.save(); c.translate(Rn.muz.x, Rn.muz.y); c.rotate(ga); const g = c.createRadialGradient(5, 0, 0, 5, 0, 22); g.addColorStop(0, "rgba(255,252,235,1)"); g.addColorStop(.3, "rgba(255,210,90,.9)"); g.addColorStop(.65, "rgba(255,110,30,.5)"); g.addColorStop(1, "rgba(200,40,10,0)"); c.fillStyle = g; c.beginPath(); c.moveTo(0, 0); c.lineTo(12, -9); c.lineTo(10, -2); c.lineTo(30, 0); c.lineTo(10, 2); c.lineTo(12, 9); c.closePath(); c.fill(); c.restore(); }
+}
+const ATK_OFF = [-2, -3, 8, 4], ATK_ROT = [-.07, -.11, .13, .05];
+function drawEnemySpr(c, e, time, pl) {
+  const key = eKey(e), D = SPRD[key], E = e.E, fl = e.flash > 0, fy = e.y + FOOT, still = gait(e, D.cyc, e.stag > 0 || e.st === "wind" || e.st === "atk");
+  const dx = pl.x - e.x, right = e.awake ? dx > 0 : Math.cos(e.ang) > 0; let flip = (D.face || 1) < 0 ? right : !right; if (e._fl === undefined || Math.abs(dx) > 10 || !e.awake) e._fl = flip; flip = e._fl; const sgn = flip ? -1 : 1, fs = sgn * (D.face || 1);
+  let ox = 0, oy = 0, lean = 0;
+  if (e.st === "atk" || (e.st === "wind" && e.tele.type !== "leap")) { const p = e.st === "atk" ? 1 - e.w / .5 : (1 - e.w / e.tele.t) * .5, f = Math.max(0, Math.min(3, Math.floor(p * 4))), d = Math.hypot(dx, pl.y - e.y) || 1; ox = dx / d * ATK_OFF[f]; oy = (pl.y - e.y) / d * ATK_OFF[f]; lean = ATK_ROT[f]; } // 攻击 4 帧：后缩蓄力 → 前扑 → 收回
+  else if (fl) lean = -.16; else if (e.stag > 0) lean = -.08; // 受击 2 帧：后仰
+  sprShadow(c, e.x, fy, e.r * 1.25, 1);
+  drawSpr(c, key, e.x + ox, fy + oy, { ph: e.gp || 0, walk: !still, flip, t: time + e.v * 9, lean: lean || 0, white: fl ? .6 : 0 });
+  e._eyes = null;
+  if (e.type === "spitter" && e.cd < .9 && !fl) { const ch = 1 - Math.max(0, e.cd) / .9; c.fillStyle = `rgba(200,255,110,${.45 + ch * .4})`; circ(c, e.x, fy - D.H * .62, 3 + ch * 4.5); }
+  if (e.burn > 0) { c.fillStyle = "rgba(255,140,40,.45)"; circ(c, e.x, fy - D.H * .45, e.r * .9); }
+  if (e.slow > 0) { c.strokeStyle = "rgba(140,220,255,.8)"; c.lineWidth = 1.5; c.beginPath(); c.ellipse(e.x, fy, e.r, e.r * .5, 0, 0, TAU); c.stroke(); }
+  if (e.hp < e.maxhp && !E.elite) { const w = Math.max(22, e.r * 1.7); c.fillStyle = "rgba(0,0,0,.7)"; c.fillRect(e.x - w / 2 - 1, fy - D.H - 7, w + 2, 4); c.fillStyle = "#c2281c"; c.fillRect(e.x - w / 2, fy - D.H - 6, w * Math.max(0, e.hp / e.maxhp), 2); }
+}
+/* 尸体：整图绕脚底转 90° 倒下（6 帧）+ 血泊扩散，保留 15 秒后淡出 */
+function drawBodySpr(c, b, time) { const D = SPRD[b.key]; if (!D) return; const k6 = Math.max(1, Math.min(6, Math.ceil(b.t / .5 * 6))), d = k6 / 6, dir = Math.cos(b.ang) >= 0 ? 1 : -1, a = b.t > 15 ? Math.max(0, 1 - (b.t - 15) / 1.5) : 1, fy = b.y + FOOT, tw = b.type === "runner" && b.t > .5 && b.t < 1.6 ? Math.sin(b.t * 46) * .05 * (1.6 - b.t) : 0;
+  c.globalAlpha = a; c.fillStyle = "rgba(64,6,6,.82)"; el(c, b.x + dir * D.H * .32 * d, fy - 3, D.H * .42 * d, D.H * .17 * d, b.v * .6 - .3); el(c, b.x + dir * D.H * .6 * d, fy + 2, D.H * .16 * d, D.H * .08 * d, 1); c.globalAlpha = 1;
+  c.save(); c.translate(b.x, fy); c.scale(dir, 1); c.rotate(d * Math.PI / 2 + tw); c.translate(-b.x, -fy); drawSpr(c, b.key, b.x, fy, { flip: false, t: 0, alpha: a * (1 - .25 * d) }); c.restore();
+ }
+Rn.SPR = SPR; Rn.drawSpr = drawSpr;
 function drawPlayer(c, pl, S, time) {
+  if (SPR.ok) return drawPlayerSpr(c, pl, S, time);
   const dead = G.state === "dead"; if (dead) pl.deadT = pl.deadT === undefined ? time : pl.deadT; else pl.deadT = undefined;
   const dk = dead ? Math.min(6, Math.ceil((time - pl.deadT) / .1 + .01)) / 6 : 0; // 死亡 6 帧：后仰倒地
   const stand = (gait(pl, CYC("player"), pl.dashT > 0 || dead) && pl.dashT <= 0) || dead, p = pl.dashT > 0 ? (pl.dashT * 7) % 1 : pl.gp || 0;
@@ -370,6 +438,7 @@ function drawPlayer(c, pl, S, time) {
 }
 function eKey(e) { return e.type === "elite" ? (e.look === "brute" ? "elite2" : "elite") : e.type; }
 function drawEnemy(c, e, time, pl) {
+  if (SPR.ok) return drawEnemySpr(c, e, time, pl);
   const E = e.E, r = e.r, fl = e.flash > 0, t = e.type; let top = -r - 16;
   if (t === "boss") { shadow(c, e.x, e.y, r, Math.atan2(e.y - pl.y, e.x - pl.x), 1, 1); const k = r / 13, C = x => fl ? "#fff" : x; c.save(); c.translate(e.x, e.y - 10); c.scale(1, .8); c.rotate(e.ang); c.scale(k, k); c.lineCap = "round";
     for (let i = 0; i < 6; i++) { const a = i / 6 * TAU + Math.sin(time * 2 + i) * .3, p = [Math.cos(a) * 8, Math.sin(a) * 8, Math.cos(a + .5) * 18, Math.sin(a + .5) * 18, Math.cos(a + Math.sin(time * 3 + i) * .6) * 24, Math.sin(a + Math.sin(time * 3 + i) * .6) * 24]; for (const [col, w] of [[OUTC, 5.2], [C("#5a3f6a"), 3.4]]) { c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(p[0], p[1]); c.quadraticCurveTo(p[2], p[3], p[4], p[5]); c.stroke(); } }
@@ -425,7 +494,7 @@ Rn.draw = function (time) {
     else { c.strokeStyle = `rgba(150,255,80,${.4 + t * .5})`; c.lineWidth = 4; c.beginPath(); c.arc(0, 0, e.r + 8, 0, TAU * t); c.stroke(); }
     c.restore(); }
   // 正在倒下 / 抽搐的尸体
-  for (const b of L.bodies) if (vis(b.x, b.y, 90)) drawBody(c, b, Math.max(1, Math.min(6, Math.ceil(b.t / .48 * 6))), b.type === "runner" && b.t > .48 ? Math.sin(b.t * 46) * 1.6 * (1 - b.t / b.dur) : 0);
+  if (SPR.ok) { for (const b of L.bodies) if (vis(b.x, b.y, 110)) drawBodySpr(c, b, time); } else for (const b of L.bodies) if (vis(b.x, b.y, 90)) drawBody(c, b, Math.max(1, Math.min(6, Math.ceil(b.t / .48 * 6))), b.type === "runner" && b.t > .48 ? Math.sin(b.t * 46) * 1.6 * (1 - b.t / b.dur) : 0);
   // 角色按 y 排序
   const list = L.en.filter(e => vis(e.x, e.y, 70)); list.push(pl); list.sort((a, b) => a.y - b.y);
   { let i = 0; const r0 = Math.max(1, Math.floor(vy0 / T) - 1), r1 = Math.min(L.H - 1, Math.floor((vy0 + vh) / T) + 2), one = e => e === pl ? drawPlayer(c, pl, S, time) : drawEnemy(c, e, time, pl);
