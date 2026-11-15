@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 120" width="160" height="120">
+  <defs>
+    <linearGradient id="skin" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8a9a7a"/><stop offset=".55" stop-color="#6b7d5e"/><stop offset="1" stop-color="#4c5a44"/>
+    </linearGradient>
+    <linearGradient id="shirt" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5d6a58"/><stop offset=".55" stop-color="#49544a"/><stop offset="1" stop-color="#333d33"/>
+    </linearGradient>
+    <linearGradient id="pants" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4a4a42"/><stop offset="1" stop-color="#33332e"/>
+    </linearGradient>
+    <radialGradient id="eye" cx=".5" cy=".5" r=".5">
+      <stop offset="0" stop-color="#ff6a5e"/><stop offset="1" stop-color="#c81e12"/>
+    </radialGradient>
+  </defs>
+  <!-- ground shadow -->
+  <ellipse cx="82" cy="106" rx="62" ry="7" fill="#000" opacity=".35"/>
+  <!-- far leg (trailing, darker, lifted) -->
+  <path d="M62 78 C48 80 36 84 28 90 L34 95 C44 91 56 87 68 84 Z" fill="#3d4a37"/>
+  <!-- far arm (planted close, darker) -->
+  <path d="M100 71 C112 77 122 84 129 92 L124 97 C115 90 104 83 96 78 Z" fill="#54634a"/>
+  <!-- torso: torn shirt, one continuous silhouette -->
+  <path d="M58 62 C70 51 100 49 114 57 C122 63 121 76 111 82 L106 78 L102 84 L96 79 L91 85 L85 80 L79 86 L73 81 L67 86 L61 81 C53 76 52 68 58 62 Z" fill="url(#shirt)"/>
+  <!-- shirt tear + stain -->
+  <path d="M72 60 L80 66 L76 72 L86 70 L82 78 L92 76" stroke="#2c352a" stroke-width="2" fill="none"/>
+  <ellipse cx="92" cy="66" rx="7" ry="4" fill="#5a1f18" opacity=".8"/>
+  <!-- near leg (trailing, extended back) -->
+  <path d="M64 82 C48 86 32 90 20 96 L26 101 C38 97 54 92 68 87 Z" fill="url(#pants)"/>
+  <path d="M20 96 C16 98 12 101 12 104 L20 105 C23 102 25 99 26 97 Z" fill="url(#skin)"/>
+  <!-- head, facing right, slightly lower -->
+  <path d="M118 49 C122 41 134 39 140 45 C146 51 144 62 137 66 C129 70 119 65 118 56 Z" fill="url(#skin)"/>
+  <path d="M120 48 L126 40 L130 47 L136 39 L139 46 L145 42 L143 50 C136 44 126 44 120 48 Z" fill="#2e2a24"/>
+  <circle cx="136" cy="53" r="3.4" fill="url(#eye)"/>
+  <path d="M140 61 C143 63 144 66 141 67 C139 68 137 66 138 64 Z" fill="#3a0f0c"/>
+  <!-- near arm (extended forward, reaching) -->
+  <path d="M104 73 C122 78 138 86 150 93 L146 99 C132 93 115 85 100 80 Z" fill="url(#skin)"/>
+  <path d="M150 93 L158 94 L156 98 L160 99 L156 102 L150 100 Z" fill="url(#skin)"/>
+</svg>
