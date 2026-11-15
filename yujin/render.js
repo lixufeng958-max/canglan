@@ -355,72 +355,90 @@ function gait(o, cyc, hold) { const mv = Math.hypot(o.x - (o._lx === undefined ?
 /* 影子：椭圆，朝背光方向偏移拉长；身体起伏时略微缩放 */
 function shadow(c, x, y, r, ang, k, sm) { c.save(); c.translate(x + Math.cos(ang) * r * .7 * k, y + Math.sin(ang) * r * .7 * k); c.rotate(ang); c.fillStyle = "rgba(0,0,0,.5)"; c.beginPath(); c.ellipse(0, 0, r * (.85 + .6 * k) * sm, r * .5 * sm, 0, 0, TAU); c.fill(); c.restore(); }
 Rn.figure = figure;
-/* ---------- PNG 贴图角色（素材包 sprites_pack）----------
-   每个角色：整图 full（待机）+ 头 / 身体 / 左腿 / 右腿 四个拆件。走路 = 两条腿绕髋关节反向摆动 + 身体起伏。
-   坐标都是原图像素（见 movement-logic.md），H 是在游戏里的身高（世界像素），cyc 是一个走路周期走过的距离 = 周期秒数 × 速度 */
-const SPRD = {
-  hero:    { f: "hero", w: 1017, h: 1489, head: 279, tTop: 249, tH: 610, lTop: 789, split: 483, ax: 400, H: 64, swing: 15, cyc: .62 * 220, bob: 2.2 },
-  walker:  { f: "zombie_ordinary", w: 1120, h: 1960, head: 392, tTop: 333, tH: 843, lTop: 1078, split: 560, ax: 560, H: 70, swing: 12, cyc: .85 * 55, bob: 1.6, sway: .035 },
-  runner:  { f: "zombie_runner", w: 1477, h: 1379, head: 275, tTop: 234, tH: 593, lTop: 758, split: 738, ax: 770, H: 58, swing: 20, cyc: .45 * 150, bob: 2.2, face: -1 },
-  bloater: { f: "zombie_bloater", w: 1327, h: 1550, head: 310, tTop: 263, tH: 667, lTop: 852, split: 663, ax: 663, H: 84, swing: 6, fill: 1, cyc: 1.0 * 35, bob: 1.4, sway: .03 }
+/* ---------- 骨架角色（素材包切出来的部件，见 tests/yj-cut.py 和 sprmeta.js）----------
+   每帧都由 头 / 身体 / 左臂 / 右臂 / 左腿 / 右腿 按骨架拼装：腿绕髋关节摆、手臂绕肩关节反向摆、身体起伏、头跟着微晃。
+   整图 *_full.png 只是切图的来源和比例参考，不进游戏。swing = 腿的摆动角（度），armK = 手臂摆幅相对腿的比例，cyc = 一个走路周期走过的距离 */
+const RIG = {
+  hero:    { m: "hero", swing: 15, armK: 0, cyc: .62 * 220, bob: 2.2 },
+  walker:  { m: "walker", swing: 12, armK: .55, cyc: .85 * 55, bob: 1.6, sway: .03, fall: 1 },
+  runner:  { m: "runner", swing: 20, armK: .6, cyc: .45 * 150, bob: 2.2, face: -1, fall: -1, order: ["arm_r", "leg_r", "leg_l", "torso", "head", "arm_l"] },
+  bloater: { m: "bloater", swing: 8, armK: .7, cyc: 1.0 * 35, bob: 1.4, sway: .03, fall: 1 },
+  spitter: { m: "spitter", swing: 10, armK: .7, cyc: .9 * 40, bob: 1.4, sway: .03, fall: -1 },
+  brute:   { m: "brute", swing: 10, armK: .5, cyc: 1.0 * 56, bob: 1.8, sway: .02, fall: 1 },
+  elite:   { m: "brute", tint: "#eef2ee", H: 112, swing: 10, armK: .5, cyc: 70, bob: 1.8, sway: .02, fall: 1 },
+  elite2:  { m: "brute", tint: "#d8887a", H: 112, swing: 10, armK: .5, cyc: 70, bob: 1.8, sway: .02, fall: 1 },
+  boss:    { m: "brute", tint: "#c0a0e8", H: 142, swing: 9, armK: .5, cyc: 78, bob: 2, sway: .02, fall: 1 },
+  crawler: { svg: 1, H: 34, cyc: .7 * 75 }
 };
-/* 暂时没有专属贴图的种类：借用现有贴图换色、放大（等素材补齐后替换） */
-for (const [k, base, tint, H, cyc] of [["spitter", "walker", "#bcdc8c", 68, .9 * 40], ["crawler", "walker", "#8a9088", 50, .7 * 75], ["brute", "bloater", "#8a93a0", 104, 1.0 * 56], ["elite", "bloater", "#e6e6e6", 108, 1.0 * 70], ["elite2", "bloater", "#c06a5a", 108, 1.0 * 70], ["boss", "bloater", "#b48ad8", 138, 1.0 * 78]]) SPRD[k] = { ...SPRD[base], base, tint, H, cyc };
-const SPR = { ok: false, n: 0 };
-(function loadSprites() { const parts = ["full", "head", "torso", "leg_l", "leg_r"], bases = Object.keys(SPRD).filter(k => !SPRD[k].base); let left = bases.length * parts.length;
-  for (const k of bases) { const D = SPRD[k]; D.img = {}; for (const p of parts) { const im = new Image(); im.onload = () => { if (--left === 0) { for (const q in SPRD) { const E = SPRD[q]; if (!E.base) continue; E.img = {}; for (const p2 of parts) { const src = SPRD[E.base].img[p2], cv = document.createElement("canvas"); cv.width = src.naturalWidth; cv.height = src.naturalHeight; const g = cv.getContext("2d"); g.drawImage(src, 0, 0); g.globalCompositeOperation = "multiply"; g.fillStyle = E.tint; g.fillRect(0, 0, cv.width, cv.height); g.globalCompositeOperation = "destination-in"; g.drawImage(src, 0, 0); E.img[p2] = cv; } } SPR.ok = true; } }; im.onerror = () => { SPR.failed = true; }; im.src = "spr/" + D.f + "_" + p + ".png"; D.img[p] = im; } } })();
-/* 画一个贴图角色。x,y = 脚下的地面位置。o：ph 走路相位(0–1) / walk 是否在走 / flip 左右翻转 / t 时间 / rot 整体绕脚底旋转 / tors 上半身转动(主角瞄准) / lean 后仰 / alpha / white 闪白 / k 额外缩放 */
+const ORDER = ["leg_l", "leg_r", "torso", "head", "arm_l", "arm_r"], SPR = { ok: false };
+(function loadRigs() { const MT = YJ.SPRMETA || {}, jobs = []; let left = 0; const done = () => { if (--left > 0) return;
+    for (const k in RIG) { const D = RIG[k]; if (D.svg) continue; const M = D.M = MT[D.m]; D.H = D.H || M.H; if (!D.tint) { D.img = RIG[D.m].img; continue; } D.img = {};
+      for (const p in M.parts) { const src = RIG[D.m].img[p], cv = document.createElement("canvas"); cv.width = src.naturalWidth; cv.height = src.naturalHeight; const g = cv.getContext("2d"); g.drawImage(src, 0, 0); g.globalCompositeOperation = "multiply"; g.fillStyle = D.tint; g.fillRect(0, 0, cv.width, cv.height); g.globalCompositeOperation = "destination-in"; g.drawImage(src, 0, 0); D.img[p] = cv; } }
+    SPR.ok = true; };
+  const load = (src, set) => { left++; const im = new Image(); im.onload = () => { set(im); done(); }; im.onerror = () => { SPR.failed = true; }; jobs.push(() => im.src = src); };
+  for (const k in RIG) { const D = RIG[k]; if (D.svg) { D.fr = []; ["a", "b"].forEach((f, i) => load("spr/crawler_" + f + ".svg", im => { const cv = document.createElement("canvas"); cv.width = 480; cv.height = 360; cv.getContext("2d").drawImage(im, 0, 0, 480, 360); D.fr[i] = cv; })); continue; }
+    if (D.m !== k || !MT[k]) continue; D.img = {}; for (const p in MT[k].parts) load("spr/" + k + "_" + p + ".png", im => D.img[p] = im); }
+  if (!left) return; jobs.forEach(j => j()); })();
+/* 画一个骨架角色。x,y = 脚下的地面位置。
+   o：ph 走路相位(0–1) / walk 是否在走 / flip 左右翻转 / t 时间 / lean 身体前后倾 / tors 上半身转向(主角瞄准) / arm 双臂张合 / dead 塌倒进度(0–1) / alpha / white 闪白 / k 缩放 */
 function drawSpr(c, key, x, y, o) {
-  const D = SPRD[key], I = D.img, s = D.H / D.h * (o.k || 1), TW = TAU; c.save(); c.translate(x, y); if (o.flip) c.scale(-1, 1); if (o.rot) c.rotate(o.rot); c.scale(s, s); if (o.alpha != null) c.globalAlpha = o.alpha;
-  const body = () => { c.translate(-D.ax, -(D.h - 14));
-    if (!o.walk && !o.tors && !o.lean) { const br = 1 + .007 * Math.sin((o.t || 0) * Math.PI); c.translate(0, D.h); c.scale(1, br); c.translate(0, -D.h); c.drawImage(I.full, 0, 0, D.w, D.h); return; } // 待机：整图 + 呼吸起伏
-    const ph = o.walk ? o.ph : 0, a = o.walk ? D.swing * Math.PI / 180 * Math.sin(TW * ph) : 0, bobS = D.bob / (D.H / D.h), bob = o.walk ? bobS * (.5 - .5 * Math.cos(2 * TW * ph)) : bobS * .5 * (.5 + .5 * Math.sin((o.t || 0) * Math.PI)), lh = D.h - D.lTop, lift = 14 / D.swing * 15;
-    if (D.fill) { c.drawImage(I.leg_l, 0, D.lTop, D.split, lh); c.drawImage(I.leg_r, D.split, D.lTop, D.w - D.split, lh); } // 拆件切到了肚子：先垫一层不动的，摆腿时中间不裂缝
-    c.save(); c.translate(D.split / 2, D.lTop); c.rotate(a); c.drawImage(I.leg_l, -D.split / 2, -lift * Math.max(0, -Math.sin(TW * ph)) * (o.walk ? 1 : 0), D.split, lh); c.restore(); // 左腿绕髋关节摆
-    const rw = D.w - D.split; c.save(); c.translate(D.split + rw / 2, D.lTop); c.rotate(-a); c.drawImage(I.leg_r, -rw / 2, -lift * Math.max(0, Math.sin(TW * ph)) * (o.walk ? 1 : 0), rw, lh); c.restore(); // 右腿反向
-    c.translate(0, bob); if (o.walk && D.sway) { c.translate(D.ax, D.lTop); c.rotate(D.sway * Math.sin(TW * ph)); c.translate(-D.ax, -D.lTop); } // 身体起伏：腿摆到最大时身体最低；丧尸还会左右晃
-    if (o.tors || o.lean) { c.translate(D.ax, D.lTop); c.rotate((o.tors || 0) + (o.lean || 0)); c.translate(-D.ax, -D.lTop); }
-    c.drawImage(I.torso, 0, D.tTop, D.w, D.tH); c.drawImage(I.head, 0, 0, D.w, D.head); };
+  const D = RIG[key]; if (D.svg) return drawCrawler(c, D, x, y, o);
+  const M = D.M, K = M.k, I = D.img, s = D.H / (M.h * K) * (o.k || 1), TW = TAU, ph = o.ph || 0, w = o.walk ? 1 : 0, d = o.dead || 0, fall = (D.fall || 1), A = D.swing * Math.PI / 180;
+  const pv = n => M.piv[n] ? [M.piv[n][0] * K, M.piv[n][1] * K] : null, hl = pv("leg_l"), hr = pv("leg_r"), hc = [(hl[0] + hr[0]) / 2, (hl[1] + hr[1]) / 2], legLen = M.h * K - hc[1];
+  const sw = w * Math.sin(TW * ph), bobS = D.bob / s, br = Math.sin((o.t || 0) * Math.PI), by = (w ? -bobS * (.5 - .5 * Math.cos(2 * TW * ph)) : -bobS * .35 * (.5 + .5 * br)) + d * legLen * .52; // 腿摆到最大时身体最低；站着时是呼吸起伏；倒下时骨盆下沉
+  const bodyRot = (o.lean || 0) + (o.tors || 0) + (D.sway || 0) * sw + d * 1.25 * fall, headRot = w * .045 * Math.sin(TW * ph + .9) + .012 * br - (o.tors || 0) * .45 + (o.lean || 0) * .5 + d * .6 * fall; // 头跟随微晃；倒下时头垂落
+  const ang = { leg_l: A * sw + d * 1.05, leg_r: -A * sw - d * .85, arm_l: -A * D.armK * sw + (o.arm || 0) - d * .75 * fall, arm_r: A * D.armK * sw - (o.arm || 0) - d * .6 * fall }, lift = 3.2 / s * (D.swing / 15) * .25;
+  const body = () => { c.translate(-M.ax * K, -(M.h * K - 4));
+    for (const n of D.order || ORDER) { const q = M.parts[n]; if (!q) continue; c.save();
+      if (n.startsWith("leg")) { const p0 = n === "leg_l" ? hl : hr, up = w * Math.max(0, n === "leg_l" ? -sw : sw) * lift; c.translate(p0[0], p0[1] + d * legLen * .52); c.rotate(ang[n]); if (d) c.scale(1, 1 - .5 * d); c.translate(-p0[0], -p0[1] - up); } // 腿绕髋关节摆；抬起的那条腿略微上提；倒下时屈膝
+      else { c.translate(hc[0], hc[1] + by); c.rotate(bodyRot); c.translate(-hc[0], -hc[1]); // 身体整体：起伏 + 前后倾
+        if (n === "head") { const p0 = pv("head"); c.translate(p0[0], p0[1]); c.rotate(headRot); c.translate(-p0[0], -p0[1]); }
+        else if (n !== "torso") { const p0 = pv(n); c.translate(p0[0], p0[1]); c.rotate(ang[n]); c.translate(-p0[0], -p0[1]); } } // 手臂绕肩关节摆，与同侧腿反相
+      c.drawImage(I[n], q[0], q[1]); c.restore(); } };
+  c.save(); c.translate(x, y); if (o.flip) c.scale(-1, 1); c.scale(s, s); if (o.alpha != null) c.globalAlpha = o.alpha;
   c.save(); body(); c.restore();
   if (o.white) { c.globalCompositeOperation = "lighter"; c.globalAlpha = (o.alpha == null ? 1 : o.alpha) * o.white; c.save(); body(); c.restore(); c.save(); body(); c.restore(); c.globalCompositeOperation = "source-over"; }
   c.restore();
 }
+/* 爬行者：SVG 两帧交替（侧面，朝右） */
+function drawCrawler(c, D, x, y, o) { const f = D.fr[o.walk && (o.ph || 0) % 1 >= .5 ? 1 : 0], hh = D.H * (o.k || 1), ww = hh * 160 / 120, d = o.dead || 0; if (!f) return;
+  c.save(); c.translate(x, y); if (o.flip) c.scale(-1, 1); if (o.lean) c.rotate(o.lean * .6); c.scale(1, 1 - .35 * d); if (o.alpha != null) c.globalAlpha = o.alpha; c.drawImage(f, -ww * .5, -hh * .88, ww, hh);
+  if (o.white) { c.globalCompositeOperation = "lighter"; c.globalAlpha = (o.alpha == null ? 1 : o.alpha) * o.white; c.drawImage(f, -ww * .5, -hh * .88, ww, hh); c.globalCompositeOperation = "source-over"; } c.restore(); }
 function sprShadow(c, x, y, w, a) { const g = c.createRadialGradient(x, y, 0, x, y, w); g.addColorStop(0, `rgba(0,0,0,${.5 * a})`); g.addColorStop(.6, `rgba(0,0,0,${.3 * a})`); g.addColorStop(1, "rgba(0,0,0,0)"); c.save(); c.translate(x, y); c.scale(1, .42); c.translate(-x, -y); c.fillStyle = g; c.beginPath(); c.arc(x, y, w, 0, TAU); c.fill(); c.restore(); }
 const FOOT = 5; // 脚底比实体中心略靠下
 function drawPlayerSpr(c, pl, S, time) {
-  const D = SPRD.hero, dead = G.state === "dead"; if (dead) pl.deadT = pl.deadT === undefined ? time : pl.deadT; else pl.deadT = undefined;
+  const D = RIG.hero, M = D.M, dead = G.state === "dead"; if (dead) pl.deadT = pl.deadT === undefined ? time : pl.deadT; else pl.deadT = undefined;
   const dk = dead ? Math.min(6, Math.ceil((time - pl.deadT) / .1 + .01)) / 6 : 0, roll = pl.dashT > 0, still = gait(pl, D.cyc * (roll ? .5 : 1), dead), walk = !still && !dead; // 翻滚时腿摆快一倍
-  const flip = Math.cos(pl.va) < 0, aa = flip ? Math.PI - pl.va : pl.va, an = ((aa % TAU) + TAU + Math.PI) % TAU - Math.PI, tors = dead ? 0 : Math.max(-.75, Math.min(.6, an - .5)) + (pl.flashT > 0 && !S.B.flame ? -.03 : 0); // 上半身带着枪转向瞄准方向（贴图只有一个朝向，转动范围有限）
-  const hit = pl.hurtT > .2 ? 1 : pl.hurtT > .08 ? .5 : 0, sgn = flip ? -1 : 1, fy = pl.y + FOOT;
-  if (dead) { c.fillStyle = "rgba(70,6,6,.85)"; el(c, pl.x - sgn * 22 * dk, fy - 2, 30 * dk, 15 * dk, 0); el(c, pl.x - sgn * 40 * dk, fy + 5, 13 * dk, 7 * dk, 1); } // 血泊扩散
-  sprShadow(c, pl.x - sgn * 26 * dk, fy, 20, 1);
-  const rec = pl.flashT > 0 && !S.B.flame ? 2 : 0; // 开枪后坐 2px
-  drawSpr(c, "hero", pl.x - Math.cos(pl.va) * rec, fy - Math.sin(pl.va) * rec * .5, { ph: pl.gp || 0, walk, flip, t: time, tors, lean: -hit * .14, rot: -dk * Math.PI / 2, white: hit === 1 ? .55 : 0, k: roll ? .92 : 1 });
+  const flip = Math.cos(pl.va) < 0, aa = flip ? Math.PI - pl.va : pl.va, an = ((aa % TAU) + TAU + Math.PI) % TAU - Math.PI, tors = dead ? 0 : Math.max(-.8, Math.min(.65, an - .5)); // 手臂和身体一体（双手持枪）：上半身带着步枪转向瞄准方向
+  const hit = pl.hurtT > .2 ? 1 : pl.hurtT > .08 ? .5 : 0, sgn = flip ? -1 : 1, fy = pl.y + FOOT, rec = pl.flashT > 0 && !S.B.flame ? 2 : 0; // 开枪后坐 2px
+  if (dead) { c.fillStyle = "rgba(70,6,6,.85)"; el(c, pl.x + sgn * 14 * dk, fy - 2, 28 * dk, 13 * dk, 0); el(c, pl.x + sgn * 30 * dk, fy + 4, 11 * dk, 6 * dk, 1); } // 血泊扩散
+  sprShadow(c, pl.x, fy, 20, 1);
+  drawSpr(c, "hero", pl.x - Math.cos(pl.va) * rec, fy - Math.sin(pl.va) * rec * .5, { ph: pl.gp || 0, walk, flip, t: time, tors, lean: -hit * .14, dead: dk, white: hit === 1 ? .55 : 0, k: roll ? .92 : 1 });
   // 枪口位置：随上半身一起转
-  const s = D.H / D.h, px = (1003 - D.ax) * s, py = (681 - D.lTop) * s, ct = Math.cos(tors), st = Math.sin(tors), mx = (px * ct - py * st) * sgn, my = (px * st + py * ct) - (D.h - 14 - D.lTop) * s, ga = flip ? Math.PI - (tors + .5) : tors + .5;
+  const s = D.H / M.h, hcx = (M.piv.leg_l[0] + M.piv.leg_r[0]) / 2, hcy = (M.piv.leg_l[1] + M.piv.leg_r[1]) / 2, px = (1003 - hcx) * s, py = (681 - hcy) * s, ct = Math.cos(tors), st = Math.sin(tors), mx = ((hcx - M.ax) * s + px * ct - py * st) * sgn, my = (px * st + py * ct) - (M.h - hcy) * s, ga = flip ? Math.PI - (tors + .5) : tors + .5;
   Rn.muz = { x: pl.x + mx, y: fy + my, a: ga };
   if (pl.flashT > 0 && !S.B.flame && !dead) { c.save(); c.translate(Rn.muz.x, Rn.muz.y); c.rotate(ga); const g = c.createRadialGradient(5, 0, 0, 5, 0, 22); g.addColorStop(0, "rgba(255,252,235,1)"); g.addColorStop(.3, "rgba(255,210,90,.9)"); g.addColorStop(.65, "rgba(255,110,30,.5)"); g.addColorStop(1, "rgba(200,40,10,0)"); c.fillStyle = g; c.beginPath(); c.moveTo(0, 0); c.lineTo(12, -9); c.lineTo(10, -2); c.lineTo(30, 0); c.lineTo(10, 2); c.lineTo(12, 9); c.closePath(); c.fill(); c.restore(); }
 }
-const ATK_OFF = [-2, -3, 8, 4], ATK_ROT = [-.07, -.11, .13, .05];
+const ATK_OFF = [-2, -3, 8, 4], ATK_LEAN = [-.1, -.16, .26, .1], ATK_ARM = [.18, .3, -.4, -.15];
 function drawEnemySpr(c, e, time, pl) {
-  const key = eKey(e), D = SPRD[key], E = e.E, fl = e.flash > 0, fy = e.y + FOOT, still = gait(e, D.cyc, e.stag > 0 || e.st === "wind" || e.st === "atk");
-  const dx = pl.x - e.x, right = e.awake ? dx > 0 : Math.cos(e.ang) > 0; let flip = (D.face || 1) < 0 ? right : !right; if (e._fl === undefined || Math.abs(dx) > 10 || !e.awake) e._fl = flip; flip = e._fl; const sgn = flip ? -1 : 1, fs = sgn * (D.face || 1);
-  let ox = 0, oy = 0, lean = 0;
-  if (e.st === "atk" || (e.st === "wind" && e.tele.type !== "leap")) { const p = e.st === "atk" ? 1 - e.w / .5 : (1 - e.w / e.tele.t) * .5, f = Math.max(0, Math.min(3, Math.floor(p * 4))), d = Math.hypot(dx, pl.y - e.y) || 1; ox = dx / d * ATK_OFF[f]; oy = (pl.y - e.y) / d * ATK_OFF[f]; lean = ATK_ROT[f]; } // 攻击 4 帧：后缩蓄力 → 前扑 → 收回
-  else if (fl) lean = -.16; else if (e.stag > 0) lean = -.08; // 受击 2 帧：后仰
+  const key = eKey(e), D = RIG[key], E = e.E, fl = e.flash > 0, fy = e.y + FOOT, still = gait(e, D.cyc, e.stag > 0 || e.st === "wind" || e.st === "atk");
+  const dx = pl.x - e.x, right = e.awake ? dx > 0 : Math.cos(e.ang) > 0; let flip = D.svg ? !right : (D.face || 1) < 0 ? right : !right; if (e._fl === undefined || Math.abs(dx) > 10 || !e.awake) e._fl = flip; flip = e._fl; const fwd = (flip ? -1 : 1) * (D.svg ? 1 : (D.face || 1)) * (right ? 1 : -1) >= 0 ? 1 : 1;
+  let ox = 0, oy = 0, lean = 0, arm = 0; const toward = (right ? 1 : -1) * (flip ? -1 : 1); // 贴图坐标里"朝玩家"是哪一侧
+  if (e.st === "atk" || (e.st === "wind" && e.tele.type !== "leap")) { const p = e.st === "atk" ? 1 - e.w / .5 : (1 - e.w / e.tele.t) * .5, f = Math.max(0, Math.min(3, Math.floor(p * 4))), dd = Math.hypot(dx, pl.y - e.y) || 1; ox = dx / dd * ATK_OFF[f]; oy = (pl.y - e.y) / dd * ATK_OFF[f]; lean = ATK_LEAN[f] * toward; arm = ATK_ARM[f]; } // 攻击 4 帧：后缩张臂 → 身体前倾扑出、双臂合拢 → 收回
+  else if (fl) lean = -.2 * toward; else if (e.stag > 0) lean = -.1 * toward; // 受击：后仰
+  const H = D.H;
   sprShadow(c, e.x, fy, e.r * 1.25, 1);
-  drawSpr(c, key, e.x + ox, fy + oy, { ph: e.gp || 0, walk: !still, flip, t: time + e.v * 9, lean: lean || 0, white: fl ? .6 : 0 });
+  drawSpr(c, key, e.x + ox, fy + oy, { ph: e.gp || 0, walk: !still, flip, t: time + e.v * 9, lean, arm, white: fl ? .6 : 0 });
   e._eyes = null;
-  if (e.type === "spitter" && e.cd < .9 && !fl) { const ch = 1 - Math.max(0, e.cd) / .9; c.fillStyle = `rgba(200,255,110,${.45 + ch * .4})`; circ(c, e.x, fy - D.H * .62, 3 + ch * 4.5); }
-  if (e.burn > 0) { c.fillStyle = "rgba(255,140,40,.45)"; circ(c, e.x, fy - D.H * .45, e.r * .9); }
+  if (e.type === "spitter" && e.cd < .9 && !fl) { const ch = 1 - Math.max(0, e.cd) / .9; c.fillStyle = `rgba(190,255,90,${.3 + ch * .45})`; circ(c, e.x + (flip ? -1 : 1) * H * .03, fy - H * .8, 3 + ch * 5); }
+  if (e.burn > 0) { c.fillStyle = "rgba(255,140,40,.45)"; circ(c, e.x, fy - H * .45, e.r * .9); }
   if (e.slow > 0) { c.strokeStyle = "rgba(140,220,255,.8)"; c.lineWidth = 1.5; c.beginPath(); c.ellipse(e.x, fy, e.r, e.r * .5, 0, 0, TAU); c.stroke(); }
-  if (e.hp < e.maxhp && !E.elite) { const w = Math.max(22, e.r * 1.7); c.fillStyle = "rgba(0,0,0,.7)"; c.fillRect(e.x - w / 2 - 1, fy - D.H - 7, w + 2, 4); c.fillStyle = "#c2281c"; c.fillRect(e.x - w / 2, fy - D.H - 6, w * Math.max(0, e.hp / e.maxhp), 2); }
+  if (e.hp < e.maxhp && !E.elite) { const w = Math.max(22, e.r * 1.7); c.fillStyle = "rgba(0,0,0,.7)"; c.fillRect(e.x - w / 2 - 1, fy - H - 7, w + 2, 4); c.fillStyle = "#c2281c"; c.fillRect(e.x - w / 2, fy - H - 6, w * Math.max(0, e.hp / e.maxhp), 2); }
 }
-/* 尸体：整图绕脚底转 90° 倒下（6 帧）+ 血泊扩散，保留 15 秒后淡出 */
-function drawBodySpr(c, b, time) { const D = SPRD[b.key]; if (!D) return; const k6 = Math.max(1, Math.min(6, Math.ceil(b.t / .5 * 6))), d = k6 / 6, dir = Math.cos(b.ang) >= 0 ? 1 : -1, a = b.t > 15 ? Math.max(0, 1 - (b.t - 15) / 1.5) : 1, fy = b.y + FOOT, tw = b.type === "runner" && b.t > .5 && b.t < 1.6 ? Math.sin(b.t * 46) * .05 * (1.6 - b.t) : 0;
-  c.globalAlpha = a; c.fillStyle = "rgba(64,6,6,.82)"; el(c, b.x + dir * D.H * .32 * d, fy - 3, D.H * .42 * d, D.H * .17 * d, b.v * .6 - .3); el(c, b.x + dir * D.H * .6 * d, fy + 2, D.H * .16 * d, D.H * .08 * d, 1); c.globalAlpha = 1;
-  c.save(); c.translate(b.x, fy); c.scale(dir, 1); c.rotate(d * Math.PI / 2 + tw); c.translate(-b.x, -fy); drawSpr(c, b.key, b.x, fy, { flip: false, t: 0, alpha: a * (1 - .25 * d) }); c.restore();
- }
+/* 尸体：按骨架塌下（6 帧：腿屈膝、身体前扑、头垂落）+ 血泊扩散，保留 15 秒后淡出 */
+function drawBodySpr(c, b, time) { const D = RIG[b.key]; if (!D) return; const d = Math.max(1, Math.min(6, Math.ceil(b.t / .5 * 6))) / 6, a = b.t > 15 ? Math.max(0, 1 - (b.t - 15) / 1.5) : 1, fy = b.y + FOOT, H = D.H, flip = !!b.flip, sg = (flip ? -1 : 1) * (D.fall || 1), tw = b.type === "runner" && b.t > .5 && b.t < 1.6 ? Math.sin(b.t * 46) * 1.4 * (1.6 - b.t) : 0;
+  c.globalAlpha = a; c.fillStyle = "rgba(64,6,6,.82)"; el(c, b.x + sg * H * .22 * d, fy - 2, H * .4 * d, H * .15 * d, b.v * .6 - .3); el(c, b.x + sg * H * .5 * d, fy + 3, H * .15 * d, H * .07 * d, 1); c.globalAlpha = 1;
+  drawSpr(c, b.key, b.x + tw, fy, { flip, t: 0, dead: d, alpha: a * (1 - .2 * d) }); }
 Rn.SPR = SPR; Rn.drawSpr = drawSpr;
 function drawPlayer(c, pl, S, time) {
   if (SPR.ok) return drawPlayerSpr(c, pl, S, time);

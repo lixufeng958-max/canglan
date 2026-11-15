@@ -1,5 +1,5 @@
 /* 余烬·尸潮 — 数据：武器、装备词条、天赋、敌人、关卡、剧情 */
-window.YJ = { TILE: 40, VERSION: "余烬 v9 · 贴图角色" };
+window.YJ = { TILE: 40, VERSION: "余烬 v9 · 骨架角色" };
 
 YJ.RAR = [{ n: "普通", c: "#B9B9B9" }, { n: "精良", c: "#4FA3FF" }, { n: "稀有", c: "#FFD23F" }, { n: "传说", c: "#FF7A2F" }];
 YJ.SLOTS = { weapon: "武器", armor: "护甲", boots: "靴子", charm: "饰品" };
@@ -91,7 +91,7 @@ YJ.THEMES = {
    每行：[名字, 主题, 目标, 目标说明, 出口名, 开场电台, 中途电台, 完成电台] */
 (function () {
   const TH = { street: { rw: [8, 12], rh: [7, 10], cw: 3 }, subway: { rw: [6, 10], rh: [5, 8], cw: 2 }, hospital: { rw: [6, 10], rh: [5, 9], cw: 2 }, base: { rw: [7, 11], rh: [6, 9], cw: 3 }, lab: { rw: [7, 10], rh: [6, 9], cw: 3 } };
-  const MIX = [{ walker: 10, runner: 2 }, { walker: 8, runner: 4, spitter: 3 }, { walker: 8, runner: 5, spitter: 3, bloater: 2 }, { walker: 8, runner: 6, spitter: 3, bloater: 2, brute: 1 }, { walker: 6, runner: 7, spitter: 4, bloater: 3, brute: 2 }]; // 爬行者暂无贴图，先不出场
+  const MIX = [{ walker: 10, runner: 2, crawler: 2 }, { walker: 8, runner: 4, crawler: 3, spitter: 3 }, { walker: 8, runner: 5, crawler: 3, spitter: 3, bloater: 2 }, { walker: 8, runner: 6, crawler: 3, spitter: 3, bloater: 2, brute: 1 }, { walker: 6, runner: 7, crawler: 4, spitter: 4, bloater: 3, brute: 2 }];
   const ACT = { street: 0, subway: 1, hospital: 2, base: 3, lab: 4 }, N = ["一", "二", "三", "四", "五", "六", "七", "八", "九", "十", "十一", "十二", "十三", "十四", "十五", "十六", "十七", "十八", "十九", "二十", "二十一"];
   const ROWS = [
     ["灰烬街区", "street", { t: "exit" }, "穿过老城区，找到通往封锁线的路口", "封锁线路口",

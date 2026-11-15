@@ -231,7 +231,7 @@ function kill(L, e) {
   blood(L, e.x, e.y, 12, rnd() * TAU);
   if (E.ai === "boom") { explode(L, e.x, e.y, 90, 80 * L.dmgM, 1, "#8fbf2a"); addPool(L, e.x, e.y, 46, 5, E.dmg * L.dmgM * .3); // 炸开：酸液、碎肉，波及周围丧尸
     for (let k = 0; k < 9; k++) { const a = rnd() * TAU, v = R(80, 300); part(L, e.x, e.y, Math.cos(a) * v, Math.sin(a) * v, R(.4, .8), pick(["#6a1a14", "#5a7a1a", "#7a2a20"]), R(4, 8), 0, "bl"); L.decals.push({ t: "gib", x: e.x + Math.cos(a) * R(20, 90), y: e.y + Math.sin(a) * R(20, 90), r: R(3, 7), ang: a }); } }
-  else { const fa = Math.atan2(e.ky, e.kx); L.bodies.push({ type: e.type, x: e.x, y: e.y, r: e.r, ang: (e.kx || e.ky) ? fa : e.ang + Math.PI, c: e.cloth, skin: E.skin, t: 0, dur: e.type === "runner" ? 1.6 : .5, v: e.v, face: e.ang, key: e.type === "elite" ? (e.look === "brute" ? "elite2" : "elite") : e.type, sv: e.type === "walker" ? (e.v * 3) | 0 : 0 });
+  else { const fa = Math.atan2(e.ky, e.kx); L.bodies.push({ type: e.type, x: e.x, y: e.y, r: e.r, ang: (e.kx || e.ky) ? fa : e.ang + Math.PI, c: e.cloth, skin: E.skin, t: 0, dur: e.type === "runner" ? 1.6 : .5, v: e.v, flip: e._fl, face: e.ang, key: e.type === "elite" ? (e.look === "brute" ? "elite2" : "elite") : e.type, sv: e.type === "walker" ? (e.v * 3) | 0 : 0 });
     if (e.type === "crawler") L.decals.push({ t: "smear", x: e.x, y: e.y, ang: e.ang, r: 46 });
     if (e.type === "brute") { G.shake = Math.max(G.shake, 12); SFX("boom", .5); for (const o of L.en) if (o !== e && !o.dead && !o.E.elite && o.r < 20 && hyp(o.x - e.x, o.y - e.y) < 62) { o.hp = 0; blood(L, o.x, o.y, 8, rnd() * TAU); } } }
   if (E.ai !== "boom" && S.legs.boom) explode(L, e.x, e.y, 70, S.wdmg * S.dmgM * 1.2, 0);
@@ -320,7 +320,7 @@ function autopilot(L) {
   let mx = (cx + bx + .5) * T - pl.x, my = (cy + by + .5) * T - pl.y; if (!bx && !by) { mx = goal.x - pl.x; my = goal.y - pl.y; }
   const gen = L.objs.find(o => o.t === "gen" && !o.done && hyp(o.x - pl.x, o.y - pl.y) < 50);
   if (gen || (L.holdOn && !tgt)) { mx = my = 0; }
-  if (tgt && bd < (tgt.E.elite ? 260 : 120) && !(L.holdOn && hyp(L.exit.x - pl.x, L.exit.y - pl.y) > 55)) { mx = pl.x - tgt.x + (pl.y - tgt.y) * .5; my = pl.y - tgt.y - (pl.x - tgt.x) * .5; }
+  if (tgt && bd < (tgt.E.elite ? 260 : 120) && !(L.holdOn && hyp(L.exit.x - pl.x, L.exit.y - pl.y) > 55)) { const gl = hyp(mx, my) || 1, rl = bd || 1; mx = (pl.x - tgt.x + (pl.y - tgt.y) * .5) / rl + mx / gl * .8; my = (pl.y - tgt.y - (pl.x - tgt.x) * .5) / rl + my / gl * .8; } // 边退边往目标挪，免得被没完没了的尸潮拖住
   else if (tgt && bd < 300 && L.en.filter(e => e.awake).length > 5) { mx *= .2; my *= .2; }
   const ml = hyp(mx, my) || 1; I.mx = mx / ml; I.my = my / ml;
   if (tgt) { I.ax = tgt.x - pl.x; I.ay = tgt.y - pl.y; I.fire = true; if (bd < 200 && rnd() < .02) I.gren = true; } else { I.ax = I.ay = 0; I.fire = false; }
