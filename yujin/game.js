@@ -54,7 +54,7 @@ YJ.calcStats = function (alt) {
   const w = eq.weapon, B = YJ.WEAPONS[w.base], sc = YJ.wScale(w);
   const S = { a, legs, base: w.base, B, maxhp: Math.round(100 + (P.lv - 1) * 9 + a.hp), dmgM: 1 + a.dmg / 100, rate: B.rate * (1 + a.rate / 100), critC: Math.min(.8, .05 + a.crit / 100), critM: 1.6 + a.critd / 100,
     msM: Math.min(1.6, 1 + a.ms / 100), armor: Math.min(.7, a.armor / 100), regen: a.regen, lok: a.lok, pierce: B.pierce + a.pierce, pellets: B.pellets + a.multi * (B.pellets > 1 ? 2 : 1), mag: Math.round(B.mag * (1 + a.mag / 100)), reload: B.reload / (1 + a.reload / 100),
-    burn: a.burn / 100, shock: a.shock / 100, xpM: 1 + a.xp / 100, mfM: 1 + a.mf / 100, grenM: 1 + a.gren / 100, dashCd: 2 * (1 - Math.min(.6, a.dash / 100)), wdmg: B.dmg * sc };
+    burn: a.burn / 100, shock: a.shock / 100, xpM: 1 + a.xp / 100, mfM: 1 + a.mf / 100, grenM: 1 + a.gren / 100, dashCd: 2.6 * (1 - Math.min(.6, a.dash / 100)), wdmg: B.dmg * sc };
   { const ex = S.pellets - B.pellets; if (ex > 0) S.wdmg *= (B.pellets + ex * .4) / S.pellets; } // 额外弹丸：每多一发总伤害 +40%，不再直接翻倍
   S.dps = Math.round(S.wdmg * S.dmgM * S.pellets * S.rate * (1 + S.critC * (S.critM - 1)));
   if (!alt) G.S = S; return S;
@@ -62,7 +62,7 @@ YJ.calcStats = function (alt) {
 
 /* ================= 地图生成 ================= */
 function endlessDef() { const th = pick(["street", "subway", "hospital", "base", "lab"]);
-  return { name: "无尽 · 废土巡猎", theme: th, act: 4, size: 72, rooms: 22, rw: [7, 11], rh: [6, 9], cw: 3, dens: .06, lvl: Math.max(1, G.P.lv - 1), endless: 1, mix: { walker: 9, runner: 5, spitter: 3, bloater: 2 }, horde: [26, 6], obj: { t: "endless" }, goal: "活下去，完成电台委托", exitName: "", radio: {} }; }
+  return { name: "无尽 · 废土巡猎", theme: th, act: 4, size: 72, rooms: 22, rw: [7, 11], rh: [6, 9], cw: 3, dens: .06, lvl: Math.max(1, G.P.lv - 1), endless: 1, mix: { walker: 9, runner: 5, crawler: 4, spitter: 3, bloater: 2 }, horde: [26, 6], obj: { t: "endless" }, goal: "活下去，完成电台委托", exitName: "", radio: {} }; }
 function genLevel(i) {
   const def = i < 0 ? endlessDef() : YJ.LEVELS[i], W = def.size, H = def.size, g = new Uint8Array(W * H).fill(1), rooms = [];
   const carve = (x0, y0, w, h) => { for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) if (x > 1 && y > 1 && x < W - 2 && y < H - 2) g[y * W + x] = 0; };
@@ -79,12 +79,11 @@ function genLevel(i) {
   else { rooms.sort((a, b) => a.cx + a.cy - b.cx - b.cy);
     for (let k = 1; k < rooms.length; k++) { let best = 0, bd = 1e9; for (let j = 0; j < k; j++) { const d = hyp(rooms[j].cx - rooms[k].cx, rooms[j].cy - rooms[k].cy); if (d < bd) { bd = d; best = j; } } link(rooms[k], rooms[best]); }
     for (let k = 0; k < 2; k++) { const a = pick(rooms), b = rooms.filter(r => r !== a).sort((p, q) => hyp(p.cx - a.cx, p.cy - a.cy) - hyp(q.cx - a.cx, q.cy - a.cy))[1]; if (b) link(a, b); } }
-  const L = { i, def, th: YJ.THEMES[def.theme], W, H, g, rooms, en: [], bul: [], drops: [], fx: [], parts: [], nums: [], objs: [], barrels: [], lamps: [], decals: [], time: 0, kills: 0, objN: 0, objDone: def.obj.t === "exit", hordeT: def.horde[0] ? 20 : 0, hordeN: 0, pools: [], bodies: [], spawnQ: [], score: 0, explored: new Uint8Array(W * H), flow: new Uint16Array(W * H), flowT: 0, radio: {}, loot: 0, lvl: def.lvl + (def.endless ? 0 : (G.P.ng || 0) * 20), misT: 18, misN: 0, mis: null, ambT: 20, base: 0 };
+  const L = { i, def, th: YJ.THEMES[def.theme], W, H, g, rooms, en: [], bul: [], drops: [], fx: [], parts: [], nums: [], objs: [], barrels: [], lamps: [], decals: [], time: 0, kills: 0, objN: 0, objDone: def.obj.t === "exit", hordeT: def.horde[0], hordeN: 0, pools: [], bodies: [], spawnQ: [], score: 0, explored: new Uint8Array(W * H), flow: new Uint16Array(W * H), flowT: 0, radio: {}, loot: 0, lvl: def.lvl + (def.endless ? 0 : (G.P.ng || 0) * 20), misT: 18, misN: 0, mis: null, ambT: 20, base: 0 };
   L.base = L.lvl;
   setLvl(L, L.lvl);
   // 从起点量距离：最远的房间放出口
   const start = rooms[0], dist = bfs(L, start.cx, start.cy);
-  L.spawnPts = [[W / 2, 0], [W / 2, H], [0, H / 2], [W, H / 2]].map(([ex, ey]) => { const r = rooms.slice(1).sort((a, b) => hyp(a.cx - ex, a.cy - ey) - hyp(b.cx - ex, b.cy - ey))[0] || start; return { x: (r.cx + .5) * T, y: (r.cy + .5) * T }; });
   for (const r of rooms) r.d = dist[r.cy * W + r.cx];
   const far = rooms.slice(1).sort((a, b) => b.d - a.d), exitR = def.arena ? rooms[1] : far[0];
   L.start = { x: (start.cx + .5) * T, y: (start.cy + .5) * T };
@@ -143,10 +142,10 @@ const los = (L, a, b) => { const d = hyp(b.x - a.x, b.y - a.y); return ray(L, a.
 
 /* ================= 敌人 ================= */
 function spawn(L, type, x, y, awake) {
-  const E = YJ.ENEMY[type], e = { type, E, x, y, r: E.r, hp: E.hp * L.hpM * (E.elite ? 1 : R(.85, 1.15)), ang: rnd() * TAU, awake, sp: E.sp * R(.9, 1.1), cd: 0, t: R(0, 1), losT: rnd() * .4, see: false, walk: rnd() * 9, flash: 0, slow: 0, burn: 0, kx: 0, ky: 0, cloth: pick(E.cloth), v: rnd(), st: "", w: 0, n: 0, sum: 6, stag: 0, atk: 0, alert: 3, hunt: awake, spT: 0, spCd: 0 };
+  const E = YJ.ENEMY[type], e = { type, E, x, y, r: E.r, hp: E.hp * L.hpM * (E.elite ? 1 : R(.85, 1.15)), ang: rnd() * TAU, awake, sp: E.sp * R(.9, 1.1), cd: 0, t: R(0, 1), losT: rnd() * .4, see: false, walk: rnd() * 9, flash: 0, slow: 0, burn: 0, kx: 0, ky: 0, cloth: pick(E.cloth), v: rnd(), st: "", w: 0, n: 0, sum: 6, stag: 0, atk: 0 };
   e.maxhp = e.hp; L.en.push(e); return e;
 }
-function wake(L, x, y, rad) { for (const e of L.en) if ((e.x - x) ** 2 + (e.y - y) ** 2 < rad * rad) { e.alert = 3; if (!e.awake) { e.awake = true; if (rnd() < .25) SFX("groan", .5); } } }
+function wake(L, x, y, rad) { for (const e of L.en) if (!e.awake && (e.x - x) ** 2 + (e.y - y) ** 2 < rad * rad) { e.awake = true; if (rnd() < .25) SFX("groan", .5); } }
 function horde(L, n, types) {
   const pl = G.pl, c = []; for (let k = 0; k < L.flow.length; k++) { const d = L.flow[k]; if (d >= 9 && d <= 15) c.push(k); }
   if (!c.length) return; const k0 = pick(c);
@@ -162,8 +161,7 @@ function updEnemy(L, e, dt) {
   if (e.type === "crawler" && e.awake && rnd() < dt * 1.5) L.decals.push({ t: "blood", x: e.x - Math.cos(e.ang) * 8, y: e.y - Math.sin(e.ang) * 8, r: R(2, 4), c: "#3a0606" });
   if (e.kx || e.ky) { move(L, e, e.kx * dt, e.ky * dt); e.kx *= .85; e.ky *= .85; if (Math.abs(e.kx) + Math.abs(e.ky) < 4) e.kx = e.ky = 0; }
   e.losT -= dt; if (e.losT <= 0) { e.losT = .35; e.see = d < 640 && los(L, e, pl); }
-  if (e.awake && !e.hunt && !E.elite) { if (e.see && d < 500) e.alert = 3; else if ((e.alert -= dt) <= 0 && d > 500) e.awake = false; } // 看不见也听不见 3 秒后失去目标
-  if (!e.awake) { if ((d < 500 && e.see) || d < 70) { e.awake = true; e.alert = 3; wake(L, e.x, e.y, 150); if (rnd() < .5) SFX("groan", .6); if (e.type === "boss") { G.radio("mid"); SFX("roar"); } }
+  if (!e.awake) { if ((d < 230 && e.see) || d < 70) { e.awake = true; wake(L, e.x, e.y, 150); if (rnd() < .5) SFX("groan", .6); if (e.type === "boss") { G.radio("mid"); SFX("roar"); } }
     else { e.t -= dt; if (e.t <= 0) { e.t = R(1, 3); e.ang += R(-1.2, 1.2); } move(L, e, Math.cos(e.ang) * 8 * dt, Math.sin(e.ang) * 8 * dt); return; } }
   // 方向：看得见就直冲，否则顺着寻路场走
   let tx = dx / (d || 1), ty = dy / (d || 1);
@@ -171,8 +169,7 @@ function updEnemy(L, e, dt) {
     for (let oy = -1; oy <= 1; oy++) for (let ox = -1; ox <= 1; ox++) { if (!ox && !oy) continue; const nx = cx + ox, ny = cy + oy, v = L.flow[ny * W + nx]; if (v === undefined || v >= best) continue;
       if (ox && oy && (L.g[cy * W + nx] !== 0 || L.g[ny * W + cx] !== 0)) continue; best = v; bx = ox; by = oy; }
     if (bx || by) { const gx = (cx + bx + .5) * T - e.x, gy = (cy + by + .5) * T - e.y, gl = hyp(gx, gy) || 1; tx = gx / gl; ty = gy / gl; } }
-  if (e.type === "runner") { e.spT -= dt; e.spCd -= dt; if (e.see && d < 420 && e.spCd <= 0) { e.spT = 1; e.spCd = 4; SFX("groan", .4); } } // 锁定后短暂加速 1.5 倍
-  let sp = e.sp * (e.slow > 0 ? .5 : 1) * (.55 + .45 * Math.max(0, e.hp / e.maxhp)) * (e.spT > 0 ? 1.5 : 1), mv = e.stag <= 0; // 血越少越迟缓；被打中会踉跄
+  let sp = e.sp * (e.slow > 0 ? .5 : 1) * (.55 + .45 * Math.max(0, e.hp / e.maxhp)), mv = e.stag <= 0; // 血越少越迟缓；被打中会踉跄
   const ai = E.ai;
   if (e.st === "wind") { e.w -= dt; mv = false; e.ang = e.tele.ang; if (e.w <= 0) doAttack(L, e); }
   else if (e.st === "dash") { e.w -= dt; mv = false; e.hitW = 0; move(L, e, Math.cos(e.ang) * 340 * dt, Math.sin(e.ang) * 340 * dt);
@@ -182,7 +179,7 @@ function updEnemy(L, e, dt) {
     if (e.cd <= 0) { e.cd = R(2.4, 3.2); e.atk = .32; const a = e.ang + R(-.08, .08), dd = Math.min(d, 330), v = 240, life = Math.max(.35, dd / v); L.bul.push({ x: e.x + Math.cos(a) * 14, y: e.y + Math.sin(a) * 14, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life, max: life, dmg: E.dmg * L.dmgM, enemy: 1, acid: 1 }); SFX("spit", .5); } }
   else if (ai === "leap" && e.see && d < 125 && e.cd <= 0 && e.stag <= 0) { tele(e, "leap", .28, Math.atan2(dy, dx)); }
   else if ((ai === "slam" || e.look === "brute") && e.see && d < 92 && e.cd <= 0 && e.st === "") { tele(e, "pound", .7, Math.atan2(dy, dx)); }
-  else if (e.st === "atk") { mv = false; const w0 = e.w; e.w -= dt; if (w0 > .3 && e.w <= .3 && d < 46 + e.r - 13 + 12) hurtPlayer(E.dmg * L.dmgM, e); if (e.w <= 0) { e.st = ""; e.cd = E.atkI || .8; } }
+  else if (ai === "boom" && d < e.r + pl.r + 14) return kill(L, e);
   else if ((ai === "charge" || ai === "boss") && e.see) {
     e.t -= dt;
     if (ai === "charge" && e.t <= 0 && d > 110 && d < 400) { e.t = R(4, 6); tele(e, "charge", .65, Math.atan2(dy, dx)); }
@@ -192,7 +189,7 @@ function updEnemy(L, e, dt) {
       else tele(e, a, a === "slam" ? .95 : a === "charge" ? .6 : .5, Math.atan2(dy, dx)); }
   }
   if (mv && e.st === "") { e.ang = Math.atan2(ty, tx); move(L, e, tx * sp * dt, ty * sp * dt);
-    if (d < 46 + e.r - 13 && e.cd <= 0 && ai !== "slam") { e.st = "atk"; e.w = .5; e.ang = Math.atan2(dy, dx); } }
+    if (d < e.r + pl.r + 5 && e.cd <= 0 && ai !== "boom" && ai !== "slam") { e.cd = .85; e.atk = .32; hurtPlayer(E.dmg * L.dmgM, e); } }
 }
 function tele(e, type, t, ang) { e.st = "wind"; e.w = t; e.tele = { type, t, ang }; }
 function doAttack(L, e) {
@@ -212,11 +209,10 @@ function blood(L, x, y, n, ang, c) { for (let k = 0; k < n; k++) { const a = ang
   const dd = R(8, 34); L.decals.push({ t: "blood", x: x + Math.cos(ang) * dd, y: y + Math.sin(ang) * dd, r: R(4, 12), c: c || "#430707", ang, sp: 1 }); }
 function hurt(L, e, dmg, crit, ang, src) {
   const S = G.S; if (S.legs.fury && G.pl.hp < S.maxhp * .4) dmg *= 1.35;
-  e.hp -= dmg; e.flash = .1; e.awake = true; e.alert = 3; if (!e.E.elite && e.type !== "brute" && e.st === "") e.stag = e.type === "walker" ? .22 : .12;
+  e.hp -= dmg; e.flash = .09; e.awake = true; if (!e.E.elite && e.type !== "brute" && e.st === "") e.stag = e.type === "walker" ? .22 : .12;
   L.nums.push({ x: e.x + R(-6, 6), y: e.y - e.r - 26, v: Math.round(dmg), crit, life: .7 });
   blood(L, e.x, e.y, crit ? 9 : 4, ang, e.type === "bloater" && rnd() < .5 ? "#4f6a16" : 0);
-  if (!e.E.elite) { e.kx += Math.cos(ang) * (crit ? 170 : 108); e.ky += Math.sin(ang) * (crit ? 170 : 108); } // 击退约 12px
-  if (e.st === "atk" && e.w > .3) { e.st = ""; e.cd = .25; } // 前摇被打断
+  if (!e.E.elite) { e.kx += Math.cos(ang) * (crit ? 150 : 70); e.ky += Math.sin(ang) * (crit ? 150 : 70); }
   if (src !== "chain") {
     if (S.burn && rnd() < S.burn) { e.burn = 3; e.burnD = dmg * .35; }
     if (S.legs.frost) e.slow = 2;
@@ -229,9 +225,9 @@ function kill(L, e) {
   L.kills++; P.kills++; if (L.def.obj.t === "purge" && !L.objDone) { L.objN++; if (L.objN === Math.floor(L.def.obj.n / 2)) G.radio("mid"); if (L.objN >= L.def.obj.n) { L.objDone = true; G.radio("done"); SFX("key"); } } L.score += Math.round(E.xp * 10 * (1 + (L.lvl - 1) * .1)); gainXp(E.xp * (1 + .2 * (L.lvl - 1)) * S.xpM);
   pl.hp = Math.min(S.maxhp, pl.hp + S.lok + (S.legs.vamp ? S.maxhp * .03 : 0)); if (S.legs.haste) pl.hasteT = 3;
   blood(L, e.x, e.y, 12, rnd() * TAU);
-  if (E.ai === "boom") { explode(L, e.x, e.y, 90, 80 * L.dmgM, 1, "#8fbf2a"); addPool(L, e.x, e.y, 46, 5, E.dmg * L.dmgM * .3); // 炸开：酸液、碎肉，波及周围丧尸
+  if (E.ai === "boom") { explode(L, e.x, e.y, 105, E.dmg * L.dmgM, 1, "#8fbf2a"); addPool(L, e.x, e.y, 46, 5, E.dmg * L.dmgM * .3); // 炸开：酸液、碎肉，波及周围丧尸
     for (let k = 0; k < 9; k++) { const a = rnd() * TAU, v = R(80, 300); part(L, e.x, e.y, Math.cos(a) * v, Math.sin(a) * v, R(.4, .8), pick(["#6a1a14", "#5a7a1a", "#7a2a20"]), R(4, 8), 0, "bl"); L.decals.push({ t: "gib", x: e.x + Math.cos(a) * R(20, 90), y: e.y + Math.sin(a) * R(20, 90), r: R(3, 7), ang: a }); } }
-  else { const fa = Math.atan2(e.ky, e.kx); L.bodies.push({ type: e.type, x: e.x, y: e.y, r: e.r, ang: (e.kx || e.ky) ? fa : e.ang + Math.PI, c: e.cloth, skin: E.skin, t: 0, dur: e.type === "runner" ? 1.6 : .5, v: e.v, flip: e._fl, face: e.ang, key: e.type === "elite" ? (e.look === "brute" ? "elite2" : "elite") : e.type, sv: e.type === "walker" ? (e.v * 3) | 0 : 0 });
+  else { const fa = Math.atan2(e.ky, e.kx); L.bodies.push({ type: e.type, x: e.x, y: e.y, r: e.r, ang: (e.kx || e.ky) ? fa : e.ang + Math.PI, c: e.cloth, skin: E.skin, t: 0, dur: e.type === "runner" ? 1.6 : .5, v: e.v, face: e.ang, key: e.type === "boss" ? null : e.type === "elite" ? (e.look === "brute" ? "elite2" : "elite") : e.type, sv: e.type === "walker" ? (e.v * 3) | 0 : 0 });
     if (e.type === "crawler") L.decals.push({ t: "smear", x: e.x, y: e.y, ang: e.ang, r: 46 });
     if (e.type === "brute") { G.shake = Math.max(G.shake, 12); SFX("boom", .5); for (const o of L.en) if (o !== e && !o.dead && !o.E.elite && o.r < 20 && hyp(o.x - e.x, o.y - e.y) < 62) { o.hp = 0; blood(L, o.x, o.y, 8, rnd() * TAU); } } }
   if (E.ai !== "boom" && S.legs.boom) explode(L, e.x, e.y, 70, S.wdmg * S.dmgM * 1.2, 0);
@@ -259,7 +255,7 @@ function explode(L, x, y, r, dmg, who, col) {
 }
 function hurtPlayer(dmg, src) {
   const pl = G.pl, S = G.S, L = G.L; if (pl.dashT > 0 || pl.inv > 0 || pl.hp <= 0 || G.state !== "play") return;
-  dmg *= (1 - S.armor) * (G.bot ? .12 : 1); pl.hp -= dmg; pl.inv = .3; pl.hurtT = .3; G.stop = .05; G.shake = Math.max(G.shake, 8); SFX("hurt"); // 0.05 秒顿帧
+  dmg *= (1 - S.armor) * (G.bot ? .12 : 1); pl.hp -= dmg; pl.inv = .3; pl.hurtT = .35; G.shake = Math.max(G.shake, 8); SFX("hurt");
   blood(L, pl.x, pl.y, 5, rnd() * TAU);
   if (S.legs.nova && pl.novaCd <= 0) { pl.novaCd = 2; explode(L, pl.x, pl.y, 120, S.wdmg * S.dmgM * 1.5, 0, "#7fd4ff"); for (const e of L.en) { const d = hyp(e.x - pl.x, e.y - pl.y); if (d < 140 && !e.E.elite) { e.kx += (e.x - pl.x) / d * 320; e.ky += (e.y - pl.y) / d * 320; } } }
   if (pl.hp <= 0) { pl.hp = 0; G.state = "dead"; G.slow = .3; SFX("dead"); setTimeout(() => { G.slow = 1; YJ.UI.dead(); }, 1500); }
@@ -273,7 +269,7 @@ function fire(L) {
   for (let k = 0; k < n; k++) { const fan = B.pellets > 1 || n === 1 ? 0 : (k - (n - 1) / 2) * .09, a = pl.ang + fan + R(-B.spread, B.spread), sp = B.speed * R(.92, 1.06);
     L.bul.push({ x: gx, y: gy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: B.range / sp * (B.flame ? R(.7, 1.1) : 1), dmg: S.wdmg * S.dmgM, pierce: S.pierce, crit: rnd() < S.critC, ex: B.ex, flame: B.flame, hit: [] }); }
   if (!B.flame) { G.shake = Math.max(G.shake, B.kick); { const sa = pl.ang + 1.8 + R(-.3, .3), sv = R(60, 110); part(L, pl.x, pl.y, Math.cos(sa) * sv, Math.sin(sa) * sv, .35, "#d8b25a", 2); L.decals.push({ t: "shell", x: pl.x + Math.cos(sa) * sv * .28, y: pl.y + Math.sin(sa) * sv * .28, ang: rnd() * 3 }); } }
-  SFX(B.flame ? "flame" : S.base, .8); wake(L, pl.x, pl.y, B.flame ? 300 : 800);
+  SFX(B.flame ? "flame" : S.base, .8); wake(L, pl.x, pl.y, B.flame ? 200 : 430);
   if (pl.mag <= 0) startReload();
 }
 function startReload() { const pl = G.pl; if (pl.rel > 0 || pl.mag >= G.S.mag) return; pl.rel = G.S.reload; pl.relMax = pl.rel; SFX("reload", .6); }
@@ -282,12 +278,10 @@ function updPlayer(L, dt) {
   pl.inv -= dt; pl.hurtT -= dt; pl.fireCd -= dt; pl.dashCd -= dt; pl.gCd -= dt; pl.flashT -= dt; pl.hasteT -= dt; pl.novaCd -= dt; pl.medCd -= dt;
   pl.hp = Math.min(S.maxhp, pl.hp + S.regen * dt);
   let mx = I.mx, my = I.my; const ml = hyp(mx, my); if (ml > 1) { mx /= ml; my /= ml; }
-  if (I.dash && pl.dashCd <= 0 && pl.dashT <= 0) { pl.dashT = .35; pl.dashCd = S.dashCd; const a = ml > .2 ? Math.atan2(my, mx) : pl.ang; pl.dx = Math.cos(a); pl.dy = Math.sin(a); SFX("dash"); }
+  if (I.dash && pl.dashCd <= 0 && pl.dashT <= 0) { pl.dashT = .28; pl.dashCd = S.dashCd; const a = ml > .2 ? Math.atan2(my, mx) : pl.ang; pl.dx = Math.cos(a); pl.dy = Math.sin(a); SFX("dash"); }
   I.dash = false;
-  if (pl.dashT > 0) { pl.dashT -= dt; move(L, pl, pl.dx * 520 * dt, pl.dy * 520 * dt); pl.vx = pl.dx * 220; pl.vy = pl.dy * 220; if (rnd() < .6) part(L, pl.x, pl.y, 0, 0, .3, "#8a9a94", 7, 0, "smoke"); }
-  else { const sp = 220 * S.msM * (pl.hasteT > 0 ? 1.25 : 1) * (I.fire && !S.B.flame ? .86 : 1), tx = mx * sp, ty = my * sp, go = ml > .1, rate = sp / (go ? .15 : .1) * dt; // 起步 0.15 秒加速到满速，松手 0.1 秒滑停
-    const dvx = tx - pl.vx, dvy = ty - pl.vy, dv = hyp(dvx, dvy); if (dv <= rate) { pl.vx = tx; pl.vy = ty; } else { pl.vx += dvx / dv * rate; pl.vy += dvy / dv * rate; }
-    const x0 = pl.x, y0 = pl.y; move(L, pl, pl.vx * dt, pl.vy * dt); if (Math.abs(pl.x - x0) < 1e-6 && Math.abs(pl.vx) > 1) pl.vx = 0; if (Math.abs(pl.y - y0) < 1e-6 && Math.abs(pl.vy) > 1) pl.vy = 0; if (go) pl.walk += dt * 11; }
+  if (pl.dashT > 0) { pl.dashT -= dt; move(L, pl, pl.dx * 430 * dt, pl.dy * 430 * dt); if (rnd() < .6) part(L, pl.x, pl.y, 0, 0, .3, "#8a9a94", 7, 0, "smoke"); }
+  else { const sp = 172 * S.msM * (pl.hasteT > 0 ? 1.25 : 1) * (I.fire && !S.B.flame ? .86 : 1); move(L, pl, mx * sp * dt, my * sp * dt); if (ml > .1) pl.walk += dt * 11; }
   for (const b of L.barrels) { if (b.dead) continue; const d = hyp(pl.x - b.x, pl.y - b.y); if (d < pl.r + b.r && d > 0) move(L, pl, (pl.x - b.x) / d * (pl.r + b.r - d), (pl.y - b.y) / d * (pl.r + b.r - d)); }
   // 瞄准：有瞄准输入用输入；触屏没输入时自动瞄最近的可见敌人
   let fireNow = I.fire;
@@ -320,7 +314,7 @@ function autopilot(L) {
   let mx = (cx + bx + .5) * T - pl.x, my = (cy + by + .5) * T - pl.y; if (!bx && !by) { mx = goal.x - pl.x; my = goal.y - pl.y; }
   const gen = L.objs.find(o => o.t === "gen" && !o.done && hyp(o.x - pl.x, o.y - pl.y) < 50);
   if (gen || (L.holdOn && !tgt)) { mx = my = 0; }
-  if (tgt && bd < (tgt.E.elite ? 260 : 120) && !(L.holdOn && hyp(L.exit.x - pl.x, L.exit.y - pl.y) > 55)) { const gl = hyp(mx, my) || 1, rl = bd || 1; mx = (pl.x - tgt.x + (pl.y - tgt.y) * .5) / rl + mx / gl * .8; my = (pl.y - tgt.y - (pl.x - tgt.x) * .5) / rl + my / gl * .8; } // 边退边往目标挪，免得被没完没了的尸潮拖住
+  if (tgt && bd < (tgt.E.elite ? 260 : 120) && !(L.holdOn && hyp(L.exit.x - pl.x, L.exit.y - pl.y) > 55)) { mx = pl.x - tgt.x + (pl.y - tgt.y) * .5; my = pl.y - tgt.y - (pl.x - tgt.x) * .5; }
   else if (tgt && bd < 300 && L.en.filter(e => e.awake).length > 5) { mx *= .2; my *= .2; }
   const ml = hyp(mx, my) || 1; I.mx = mx / ml; I.my = my / ml;
   if (tgt) { I.ax = tgt.x - pl.x; I.ay = tgt.y - pl.y; I.fire = true; if (bd < 200 && rnd() < .02) I.gren = true; } else { I.ax = I.ay = 0; I.fire = false; }
@@ -378,14 +372,13 @@ function updEndless(L, dt) {
 /* ================= 主循环 ================= */
 YJ.startLevel = function (i) {
   const L = G.L = genLevel(i); YJ.calcStats();
-  G.pl = { x: L.start.x, y: L.start.y, r: 12, ang: 0, hp: G.S.maxhp, fireCd: 0, mag: G.S.mag, rel: 0, relMax: 1, dashT: 0, dashCd: 0, gCd: 0, inv: 1, hurtT: 0, walk: 0, va: 0, mvx: 0, mvy: 0, vx: 0, vy: 0, hasteT: 0, flashT: 0, novaCd: 0, medCd: 0 };
+  G.pl = { x: L.start.x, y: L.start.y, r: 12, ang: 0, hp: G.S.maxhp, fireCd: 0, mag: G.S.mag, rel: 0, relMax: 1, dashT: 0, dashCd: 0, gCd: 0, inv: 1, hurtT: 0, walk: 0, va: 0, mvx: 0, mvy: 0, hasteT: 0, flashT: 0, novaCd: 0, medCd: 0 };
   G.cam = { x: L.start.x, y: L.start.y, lx: 0, ly: 0 }; G.state = "play"; if (L.def.endless) setTimeout(() => G.say([["林夏", "这片区域没有出口，也没有尽头。活下去，频道里有人求救我就转给你。"]]), 600); G.slow = 1; G.shake = 0; G.inp.mx = G.inp.my = G.inp.ax = G.inp.ay = 0; G.inp.fire = false;
   YJ.Render.build(L); setTimeout(() => G.radio("start"), 600);
 };
 YJ.refreshWeapon = function () { YJ.calcStats(); if (G.pl) { G.pl.mag = Math.min(G.pl.mag, G.S.mag); G.pl.hp = Math.min(G.pl.hp, G.S.maxhp); } };
 YJ.update = function (dtReal) {
   const L = G.L, pl = G.pl; if (!L || (G.state !== "play" && G.state !== "dead")) return;
-  if (G.stop > 0 && !G.bot) { G.stop -= dtReal; return; }
   const dt = Math.min(1 / 30, dtReal) * G.slow; L.time += dt; G.shake *= Math.pow(.02, dt);
   // 空间网格（子弹判定用）
   const grid = L.grid = new Map(); for (const e of L.en) { const x0 = Math.floor((e.x - e.r) / 80), x1 = Math.floor((e.x + e.r) / 80), y0 = Math.floor((e.y - e.r) / 80), y1 = Math.floor((e.y + e.r) / 80); for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) { const k = (x << 8) | y; let c = grid.get(k); if (!c) grid.set(k, c = []); c.push(e); } }
@@ -398,7 +391,7 @@ YJ.update = function (dtReal) {
   L.en = L.en.filter(e => !e.dead);
   updBullets(L, dt);
   for (let i = L.parts.length - 1; i >= 0; i--) { const p = L.parts[i]; p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= .92; p.vy *= .92; if (p.life <= 0) { if (p.k === "bl" && rnd() < .6 && !solid(L, p.x, p.y)) L.decals.push({ t: "blood", x: p.x, y: p.y, r: p.s * R(.6, 1.2), c: p.c }); L.parts.splice(i, 1); } }
-  for (let i = L.bodies.length - 1; i >= 0; i--) { const b = L.bodies[i]; b.t += dt; if (!b.pool && b.t > .5) { b.pool = 1; L.decals.push({ t: "blood", x: b.x, y: b.y + 4, r: b.r * 1.5, c: "#3a0707", ang: b.ang, sp: 1 }); } if (b.t >= 16.5) L.bodies.splice(i, 1); }
+  for (let i = L.bodies.length - 1; i >= 0; i--) { const b = L.bodies[i]; b.t += dt; if (b.t >= b.dur) { L.decals.push({ ...b, t: "corpse", type: b.type }); L.bodies.splice(i, 1); } }
   for (let i = L.spawnQ.length - 1; i >= 0; i--) { const q = L.spawnQ[i]; if ((q.t -= dt) <= 0) { spawn(L, q.type, q.x, q.y, true); L.spawnQ.splice(i, 1); } }
   for (let i = L.pools.length - 1; i >= 0; i--) { const q = L.pools[i]; q.life -= dt; q.t -= dt; if (q.life <= 0) { L.pools.splice(i, 1); continue; }
     if (q.t <= 0 && G.state === "play" && hyp(pl.x - q.x, pl.y - q.y) < q.r + 4 && pl.dashT <= 0) { q.t = .5; hurtPlayer(q.dmg); } }
@@ -421,11 +414,7 @@ YJ.update = function (dtReal) {
     if (ob.t === "gen") { if (d < 62) { if (!ob.on) { ob.on = true; horde(L, 7 + L.objN * 3, { walker: 5, runner: 5, bloater: 2 }); G.toast("发电机启动中，守住！", "gold"); SFX("gen"); } ob.prog += dt / 8; if (rnd() < dt * 1.2) horde(L, 2); if (ob.prog >= 1) { ob.done = true; L.objN++; SFX("key"); G.toast(o.name + " " + L.objN + "/" + o.n, "gold"); L.lamps.push({ x: ob.x, y: ob.y, r: 240, c: "#9effa0", f: 0 }); if (L.objN === 2) G.radio("mid"); } } }
     if (L.objN >= o.n && !L.objDone) { L.objDone = true; G.radio("done"); } }
   // 尸潮
-  // 波次刷怪（movement-logic.md）：地图边缘 4 个固定点随机选一个，每波 6 + 波次×3 只，间隔 20 秒；场上追击中的丧尸满 40 只就暂停
-  if (L.def.horde[0]) { L.hordeT -= dt; if (L.hordeT <= 0) { let act = 0; for (const e of L.en) if (e.awake) act++;
-      if (act >= 40) L.hordeT = 2; else { L.hordeT = 20; const w = ++L.hordeN, n = Math.min(6 + w * 3, 40 - act), mx = L.def.mix, types = { walker: 10 }; if (w >= 3) types.runner = 3 + (mx.runner || 0) * .5; if (w >= 5) types.bloater = 2 + (mx.bloater || 0) * .5; if (w >= 4 && mx.spitter) types.spitter = mx.spitter * .6; if (w >= 6 && mx.brute) types.brute = mx.brute * .5;
-        const pt = pick(L.spawnPts); for (let i = 0; i < n; i++) { const a = rnd() * TAU, rr = R(0, 60), x = pt.x + Math.cos(a) * rr, y = pt.y + Math.sin(a) * rr; L.spawnQ.push({ t: 1.3 + i * .25, type: wpick(types), x: blocked(L, x, y, 14) ? pt.x : x, y: blocked(L, x, y, 14) ? pt.y : y }); }
-        SFX("horde"); if (w === 1 && o.t !== "collect" && o.t !== "activate") G.radio("mid"); G.toast("第 " + w + " 波尸群正在逼近……", "red"); } } }
+  if (L.def.horde[0]) { L.hordeT -= dt; if (L.hordeT <= 0 && L.en.length < 90) { L.hordeT = L.def.horde[0] * R(.8, 1.2); L.hordeN++; horde(L, L.def.horde[1] + L.hordeN, L.def.mix); if (L.hordeN === 1 && o.t !== "collect" && o.t !== "activate") G.radio("mid"); G.toast("尸群正在逼近……", "red"); } }
   if (L.objDone && !L.won) { const near = hyp(L.exit.x - pl.x, L.exit.y - pl.y) < 80, hold = L.def.arena ? 0 : YJ.holdTime(L);
     if (near && hold && !L.holdOn) { L.holdOn = true; L.holdP = 0; G.toast("正在开门——守住！", "red"); SFX("horde", .8); horde(L, Math.min(26, 8 + L.i * 2), L.def.mix); L.holdW = 5; }
     if (L.holdOn && near) { L.holdP += dt; L.holdW -= dt; if (L.holdW <= 0 && L.en.length < 90) { L.holdW = 5; horde(L, Math.min(14, 4 + L.i), L.def.mix); } }

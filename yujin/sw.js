@@ -1,6 +1,6 @@
 // 离线缓存：先用网络取最新版（绕过浏览器 HTTP 缓存），断网时用缓存。改了文件就把版本号 +1
-const CACHE = "yujin-v9";
-const FILES = ["./", "./index.html", "./data.js", "./game.js", "./render.js", "./audio.js", "./ui.js", "./manifest.webmanifest", "./icon-180.png", "./icon-192.png", "./icon-512.png", "./sprmeta.js", "./spr/bloater_arm_l.png", "./spr/bloater_arm_r.png", "./spr/bloater_head.png", "./spr/bloater_leg_l.png", "./spr/bloater_leg_r.png", "./spr/bloater_torso.png", "./spr/brute_arm_l.png", "./spr/brute_arm_r.png", "./spr/brute_head.png", "./spr/brute_leg_l.png", "./spr/brute_leg_r.png", "./spr/brute_torso.png", "./spr/crawler_a.svg", "./spr/crawler_b.svg", "./spr/hero_head.png", "./spr/hero_leg_l.png", "./spr/hero_leg_r.png", "./spr/hero_torso.png", "./spr/runner_arm_l.png", "./spr/runner_arm_r.png", "./spr/runner_head.png", "./spr/runner_leg_l.png", "./spr/runner_leg_r.png", "./spr/runner_torso.png", "./spr/spitter_arm_l.png", "./spr/spitter_head.png", "./spr/spitter_leg_l.png", "./spr/spitter_leg_r.png", "./spr/spitter_torso.png", "./spr/walker_arm_l.png", "./spr/walker_arm_r.png", "./spr/walker_head.png", "./spr/walker_leg_l.png", "./spr/walker_leg_r.png", "./spr/walker_torso.png"];
+const CACHE = "yujin-v10";
+const FILES = ["./", "./index.html", "./data.js", "./game.js", "./render.js", "./audio.js", "./ui.js", "./manifest.webmanifest", "./icon-180.png", "./icon-192.png", "./icon-512.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES))); self.skipWaiting(); });
 self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))); self.clients.claim(); });
 self.addEventListener("fetch", e => {
