@@ -85,7 +85,7 @@ input{font:inherit;font-size:16px;color:var(--text);background:var(--card);borde
 /* 牌面是角色画像：铺满整张牌，名字压在底部 */
 .card .pic{position:absolute;inset:0;background:#1A1016 center top/cover no-repeat}
 .card .pic::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.25) 0%,transparent 22%,transparent 58%,rgba(16,9,13,.92) 86%)}
-.card:not(.back) .rib{margin-top:auto;margin-bottom:0;z-index:1}
+.card:not(.back) .rib{margin-top:auto !important;margin-bottom:0;z-index:1}
 .card:not(.back) small{margin-top:1px;margin-bottom:8px;z-index:1;color:#E9DCC8;text-shadow:0 1px 2px #000}
 .card:not(.back) .num{z-index:1}.card:not(.back) b{text-shadow:0 1px 3px #000}
 .card.mini:not(.back) .rib{margin-bottom:4px}.seat .cards .card.mini:not(.back) .rib{margin-bottom:2px}
@@ -120,7 +120,7 @@ input{font:inherit;font-size:16px;color:var(--text);background:var(--card);borde
 .ibtn{border:1px solid var(--line);background:var(--card);border-radius:3px;height:38px;min-width:44px;padding:0 10px;font-family:var(--display);font-weight:700;font-size:14px}
 .table{flex:1;position:relative;overflow:hidden;min-height:0}
 .table::before{content:"";position:absolute;left:50%;top:50%;width:96%;height:94%;transform:translate(-50%,-50%);border-radius:50%;background:radial-gradient(circle at 50% 40%,#4A2A3A,#2E1C26 70%,transparent 72%);box-shadow:inset 0 0 0 2px rgba(217,169,58,.25),inset 0 0 40px rgba(0,0,0,.5)}
-.seat{position:absolute;transform:translate(-50%,-50%);width:78px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;transition:left .3s,top .3s}
+.seat{position:absolute;transform:translate(-50%,-62px);width:78px;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;transition:left .3s,top .3s}
 .seat .av{position:relative;width:32px;height:32px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-family:var(--display);font-weight:900;font-size:16px;color:#1C1218;box-shadow:0 2px 8px rgba(0,0,0,.5)}
 .seat .nm{font-size:11px;font-family:var(--display);font-weight:600;max-width:78px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:center}
 .seat .hearts{font-size:10px;line-height:1}
@@ -129,7 +129,13 @@ input{font:inherit;font-size:16px;color:var(--text);background:var(--card);borde
 .seat .cards .card.mini .art{width:18px;height:18px;margin-top:11px}.seat .cards .card.mini b{font-size:8.5px}.seat .cards .card.mini .num{width:12px;height:12px;font-size:8px;left:3px;top:3px}.seat .cards .card.mini .fr{inset:2px}
 .seat .cards .card.mini.back .seal{width:16px;height:24px;font-size:8px;line-height:1.2}
 .seat .cnt{position:absolute;right:-4px;bottom:-4px;min-width:16px;height:16px;border-radius:8px;background:var(--gold);color:#1C1218;font-size:10px;font-weight:700;display:grid;place-items:center;padding:0 3px}
-.seat .dpile{position:relative}
+.seat .dpile{display:flex;flex-wrap:wrap;justify-content:center;width:84px;gap:2px}
+/* 弃牌陈列：小牌一张张摆开（不叠），一行 3 张，多了换行 */
+.card.mini.tiny{width:26px;height:38px;border-radius:4px;border-width:1px;box-shadow:0 2px 4px rgba(0,0,0,.5)}
+.card.mini.tiny .fr{display:none}.card.mini.tiny .num{left:1px;top:1px;width:11px;height:11px;font-size:7.5px}
+.card.mini.tiny b{font-size:7.5px;letter-spacing:0}.card.mini.tiny:not(.back) .rib{margin-bottom:1px;padding:0}
+.card.mini.tiny.empty{font-size:9px}
+.seat .dpile .card.tiny:nth-child(n+7){margin-top:-24px}
 .seat.cur .av{border-color:var(--gold);box-shadow:0 0 0 3px rgba(217,169,58,.3),0 0 18px rgba(217,169,58,.6);animation:blink 1.2s ease-in-out infinite}
 .seat.out{opacity:.5}.seat.out .av{filter:grayscale(1)}
 .seat.safe .av{border-color:var(--c4);box-shadow:0 0 0 3px rgba(217,143,176,.35)}
@@ -159,7 +165,7 @@ input{font:inherit;font-size:16px;color:var(--text);background:var(--card);borde
 .me .who{display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:4px}
 .me .who i{width:12px;height:12px;border-radius:50%}
 .me .who b{font-family:var(--display)}
-.me .who .disc{margin-left:auto;font-size:11px;color:var(--muted);max-width:55%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.me .who .disc{margin-left:auto;font-size:11px;color:var(--muted);max-width:70%;display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:2px;cursor:pointer}.me .who .disc em{font-style:normal;margin-right:4px}
 .me .who .disc span{font-weight:700}
 #status{font-family:var(--display);font-size:15px;text-align:center;padding:4px 0 8px;color:var(--soft)}
 .hand{display:flex;gap:14px;justify-content:center;min-height:150px;align-items:flex-end;padding-top:12px}

@@ -5,7 +5,7 @@ const $ = s => document.querySelector(s);
 const el = h => { const t = document.createElement("template"); t.innerHTML = h.trim(); return t.content.firstElementChild; };
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 let ONLINE = null, LOCAL = new QSNet.LocalNet(), NET = null, G = null;
-const VERSION = "情书 v13 · 天师与亲王"; // 每次更新改一下，方便在手机上确认是不是新版
+const VERSION = "情书 v14 · 弃牌陈列"; // 每次更新改一下，方便在手机上确认是不是新版
 for (const id of ["verA", "verH"]) { const e = document.getElementById(id); if (e) e.textContent = VERSION; }
 const show = id => document.querySelectorAll(".screen").forEach(s => s.hidden = s.id !== id);
 function toast(text, kind = "") { const box = $("#toasts"); const t = el(`<div class="toast ${kind}"></div>`); t.textContent = text; box.prepend(t); while (box.children.length > 3) box.lastChild.remove(); setTimeout(() => t.remove(), 3800); }
@@ -231,7 +231,8 @@ function render() {
   // 对手一排
   // 围桌：对手固定围成一圈，不用滑动
   const ops = $("#opps"); ops.innerHTML = "";
-  const others = s.order.filter(p => p !== me), n = others.length;
+  // 座位从自己的下家开始、按出牌顺序顺时针排（左→上→右），这样每个人看到的都是同一张桌子
+  const mi = s.order.indexOf(me), others = s.order.slice(mi + 1).concat(s.order.slice(0, Math.max(0, mi))), n = others.length;
   // 从左下 160° 经过顶部到右下 380°，均匀排在一个椭圆上
   const spread = { 1: 0, 2: 110, 3: 160, 4: 200, 5: 220 }[n] || 220;
   const SEATS = others.map((_, i) => { const a = (n === 1 ? 270 : 270 - spread / 2 + spread * i / (n - 1)) * Math.PI / 180; return [50 + 41 * Math.cos(a), 50 + 40 * Math.sin(a)]; });
@@ -240,11 +241,12 @@ function render() {
     const last = t.disc.length ? t.disc[t.disc.length - 1] : null;
     const known = mine.know[p] != null && !t.out ? mine.know[p] : null;
     const [x, y] = SEATS[i] || [50, 20];
-    const d = el(`<div class="seat ${t.out ? "out" : ""} ${cur ? "cur" : ""} ${t.safe ? "safe" : ""}" style="left:${x}%;top:${y}%" data-p="${p}">
+    const d = el(`<div class="seat ${t.out ? "out" : ""} ${cur ? "cur" : ""} ${t.safe ? "safe" : ""}" style="left:clamp(46px,${x}%,calc(100% - 46px));top:max(66px,${y}%)" data-p="${p}">
       <div class="av" style="background:${P.color}">${esc([...P.name][0])}</div>
       <div class="nm"></div>
       <span class="hearts">${"❤".repeat(P.tokens)}<span class="dim">${"♡".repeat(Math.max(0, s.need - P.tokens))}</span></span>
-      <div class="cards">${t.out ? `<div class="card mini gone">出局</div>` : known != null ? cardHTML(known, "mini known") : backHTML("mini")}<div class="dpile">${last != null ? cardHTML(last, "mini") : `<div class="card mini empty">弃</div>`}${t.disc.length > 1 ? `<span class="cnt">${t.disc.length}</span>` : ""}</div></div>
+      <div class="cards">${t.out ? `<div class="card mini gone">出局</div>` : known != null ? cardHTML(known, "mini known") : backHTML("mini")}</div>
+      <div class="dpile">${t.disc.length ? t.disc.map(v => cardHTML(v, "mini tiny")).join("") : `<div class="card mini tiny empty">弃</div>`}</div>
       ${t.out ? `<span class="badge outb">出局</span>` : t.safe ? `<span class="badge">侍女保护</span>` : cur ? `<span class="badge turn">思考中…</span>` : ""}</div>`);
     d.querySelector(".nm").textContent = P.name;
     d.onclick = () => openPlayer(p);
@@ -263,7 +265,7 @@ function render() {
   $("#recent").innerHTML = s.log.filter(l => (l.vis === "all" || l.vis.includes(me)) && l.kind !== "turn").slice(-3).map(l => `<li class="${l.kind}">${esc(l.text)}</li>`).join("");
   $("#me-hearts").innerHTML = "❤".repeat(s.P[me].tokens) + `<span class="dim">${"♡".repeat(Math.max(0, s.need - s.P[me].tokens))}</span>`;
   $("#me-name").textContent = s.P[me].name; $("#me-flag").style.background = s.P[me].color;
-  $("#me-disc").innerHTML = mine.disc.length ? "弃牌：" + mine.disc.map(v => `<span class="c${v}">${CARDS[v].name}</span>`).join("、") : ""; $("#me-disc").onclick = () => openPlayer(me);
+  $("#me-disc").innerHTML = mine.disc.length ? "<em>弃牌</em>" + mine.disc.map(v => cardHTML(v, "mini tiny")).join("") : ""; $("#me-disc").onclick = () => openPlayer(me);
   // 我的手牌
   const h = $("#hand"); h.innerHTML = "";
   const must = s.mustPlay(mine.hand);
