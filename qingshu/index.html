@@ -17,7 +17,7 @@
 <style>
 /* 宫廷夜色：绛紫底、金线、八种牌各有一色 */
 :root{--bg:#1C1218;--panel:#2A1A22;--panel-2:#3A2630;--card:#33202A;--text:#F2E6D8;--soft:#D4C2B0;--muted:#9E8A8E;--line:#5A3E48;--gold:#D9A93A;--red:#C9323F;--good:#6BBF6E;--bad:#FF6A6A;
-  --c0:#9A9A9A;--c1:#8FA3B5;--c2:#7FB0A0;--c3:#C9A24A;--c4:#D98FB0;--c5:#5FB8E8;--c6:#6FCFA0;--c7:#E0B13F;--c8:#B48CFF;--c9:#FF6B8A;
+  --c0:#9A9A9A;--c1:#8FA3B5;--c2:#7FB0A0;--c3:#C9A24A;--c4:#D98FB0;--c5:#5FB8E8;--c6:#6FCFA0;--c7:#E0B13F;--c8:#B48CFF;--c9:#FF6B8A;--cq:#9D7BEA;
   --display:"Noto Serif SC","Songti SC","STSong",serif;--body:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;
   --st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px);--gl:max(14px,env(safe-area-inset-left,0px));--gr:max(14px,env(safe-area-inset-right,0px));
   --grain:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .95  0 0 0 0 .8  0 0 0 0 .7  0 0 0 .06 0'/></filter><rect width='160' height='160' filter='url(%23n)'/></svg>");color-scheme:dark}
@@ -80,7 +80,15 @@ input{font:inherit;font-size:16px;color:var(--text);background:var(--card);borde
 .card .rib::before{top:0}.card .rib::after{bottom:0}
 .card b{font-family:var(--display);font-weight:900;font-size:17px;letter-spacing:.16em;text-shadow:0 1px 2px #000,0 0 10px color-mix(in srgb,var(--cc) 50%,transparent)}
 .card small{font-size:9.5px;color:color-mix(in srgb,var(--cc) 70%,var(--muted));margin-top:auto;margin-bottom:9px;letter-spacing:.1em}
-.c0{--cc:var(--c0)}.c1{--cc:var(--c1)}.c2{--cc:var(--c2)}.c3{--cc:var(--c3)}.c4{--cc:var(--c4)}.c5{--cc:var(--c5)}.c6{--cc:var(--c6)}.c7{--cc:var(--c7)}.c8{--cc:var(--c8)}.c9{--cc:var(--c9)}
+/* 牌值 → 颜色（--c0…--c9 是老编号的颜色名，这里按新编号对应到角色） */
+.c0{--cc:var(--c0)}.c1{--cc:var(--c1)}.c2{--cc:var(--c4)}.c3{--cc:var(--c2)}.c4{--cc:var(--c3)}.c5{--cc:var(--c6)}.c6{--cc:var(--cq)}.c7{--cc:var(--c5)}.c8{--cc:#E8705A}.c9{--cc:var(--c7)}.c10{--cc:var(--c9)}
+/* 牌面是角色画像：铺满整张牌，名字压在底部 */
+.card .pic{position:absolute;inset:0;background:#1A1016 center top/cover no-repeat}
+.card .pic::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(0,0,0,.25) 0%,transparent 22%,transparent 58%,rgba(16,9,13,.92) 86%)}
+.card:not(.back) .rib{margin-top:auto;margin-bottom:0;z-index:1}
+.card:not(.back) small{margin-top:1px;margin-bottom:8px;z-index:1;color:#E9DCC8;text-shadow:0 1px 2px #000}
+.card:not(.back) .num{z-index:1}.card:not(.back) b{text-shadow:0 1px 3px #000}
+.card.mini:not(.back) .rib{margin-bottom:4px}.seat .cards .card.mini:not(.back) .rib{margin-bottom:2px}
 .xtag{font-size:10px;background:var(--c6);color:#1C1218;padding:1px 6px;border-radius:3px;margin-left:6px;font-weight:700;vertical-align:middle}
 .card.mini{width:56px;height:82px;border-radius:7px;box-shadow:inset 0 0 0 1px rgba(0,0,0,.6),0 4px 10px rgba(0,0,0,.45)}
 .card.mini .fr{inset:3px;border-radius:4px}.card.mini .fr::before{display:none}
@@ -245,7 +253,7 @@ input{font:inherit;font-size:16px;color:var(--text);background:var(--card);borde
 <section class="screen page" id="sAuth" hidden>
   <div class="wrap">
     <h1 class="logo">情书<small>宫 廷 传 书</small></h1>
-    <p class="lead">16 张牌，8 种角色，每人手里只有 1 张。猜牌、比牌、偷看、调换，把情书送到公主手里。2–4 人联机，几分钟一局。</p>
+    <p class="lead">17 张牌，9 种角色，每人手里只有 1 张。猜牌、比牌、偷看、调换，把情书送到公主手里。2–4 人联机，几分钟一局。</p>
     <div id="authOnline">
       <div class="seg" id="authSeg"><button aria-pressed="true" data-m="in">登录</button><button aria-pressed="false" data-m="up">注册</button></div>
       <div style="display:flex;flex-direction:column;gap:10px;margin-top:12px">
@@ -292,7 +300,7 @@ input{font:inherit;font-size:16px;color:var(--text);background:var(--card);borde
     <button class="btn ghost sm" id="rCopy" style="align-self:center">复制房间号</button>
     <div class="h">玩家 <span class="tip" id="rCount"></span></div>
     <div class="plist" id="rPlayers"></div>
-    <div class="cardbox tip">牌组：<b id="rDeck">16 张经典牌</b>（4 人及以下 16 张；5–6 人自动换 21 张扩展牌）。先集满 <b id="rNeed">4</b> 颗 ❤ 的人获胜（两人 7、三人 5、四人 4、五六人 3）。</div>
+    <div class="cardbox tip">牌组：<b id="rDeck">17 张经典牌</b>（4 人及以下 17 张；5–6 人自动换 22 张扩展牌）。先集满 <b id="rNeed">4</b> 颗 ❤ 的人获胜（两人 7、三人 5、四人 4、五六人 3）。</div>
     <div id="rHost">
       <button class="btn ghost block" id="rBot">＋ 加一个电脑玩家</button>
       <p class="err" id="rErr"></p>
@@ -328,7 +336,6 @@ input{font:inherit;font-size:16px;color:var(--text);background:var(--card);borde
 
 <script src="config.js"></script>
 <script src="sim.js"></script>
-<script src="art.js"></script>
 <script src="net.js"></script>
 <script src="audio.js"></script>
 <script src="app.js"></script>

@@ -1,11 +1,11 @@
 /* 情书·宫廷传书 — 界面与流程（登录、首页、房间、牌局） */
 "use strict";
-const { Sim, CARDS, TOKENS, botDecide } = window.QS;
+const { Sim, CARDS, K, TOKENS, botDecide } = window.QS;
 const $ = s => document.querySelector(s);
 const el = h => { const t = document.createElement("template"); t.innerHTML = h.trim(); return t.content.firstElementChild; };
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 let ONLINE = null, LOCAL = new QSNet.LocalNet(), NET = null, G = null;
-const VERSION = "情书 v12 · 已知手牌修正"; // 每次更新改一下，方便在手机上确认是不是新版
+const VERSION = "情书 v13 · 天师与亲王"; // 每次更新改一下，方便在手机上确认是不是新版
 for (const id of ["verA", "verH"]) { const e = document.getElementById(id); if (e) e.textContent = VERSION; }
 const show = id => document.querySelectorAll(".screen").forEach(s => s.hidden = s.id !== id);
 function toast(text, kind = "") { const box = $("#toasts"); const t = el(`<div class="toast ${kind}"></div>`); t.textContent = text; box.prepend(t); while (box.children.length > 3) box.lastChild.remove(); setTimeout(() => t.remove(), 3800); }
@@ -70,7 +70,7 @@ function enterRoom(net, code) {
 function renderRoom(net, room) {
   const host = room.host === net.user.uid;
   $("#rCount").textContent = `${room.players.length} / 6`;
-  $("#rDeck").textContent = room.players.length >= 5 ? "21 张扩展牌（多了细作、国公）" : "16 张经典牌";
+  $("#rDeck").textContent = room.players.length >= 5 ? "22 张扩展牌（多了细作、国公）" : "17 张经典牌";
   const pl = $("#rPlayers"); pl.innerHTML = "";
   room.players.forEach(p => {
     const row = el(`<div class="pl"><i style="background:${p.color}"></i><span></span><small>${p.bot ? "电脑" : p.id === room.host ? "房主" : ""}</small>${host && p.bot ? '<button>移除</button>' : ""}</div>`);
@@ -205,11 +205,11 @@ async function playFx(f) {
   const at = f.t != null ? posOf(f.t) : from, res = [];
   const put = (html, cls, dy = 0, where = at) => { const r = el(`<div class="res ${cls}">${html}</div>`); r.style.left = Math.max(96, Math.min(innerWidth - 96, where.x)) + "px"; r.style.top = Math.max(70, where.y - 34 + dy) + "px"; layer.append(r); r.animate([{ opacity: 0, transform: "translate(-50%,-30%) scale(.6)" }, { opacity: 1, transform: "translate(-50%,-50%) scale(1)" }], { duration: 260, easing: "cubic-bezier(.2,.8,.3,1.3)", fill: "forwards" }); res.push(r); return r; };
   if (f.guess != null) put(`猜「${CARDS[f.guess].name}」${f.hit ? "" : " · 没猜中"}`, f.hit ? "good" : "");
-  if (f.secret && f.secret[me] != null && (f.by === me || f.t === me)) { const v = f.secret[me]; put(`${f.card === 7 ? "换到" : f.card === 3 ? "对方是" : "看到"} ${cardHTML(v, "mini")}`, "good", f.guess != null ? -40 : 0, f.card === 7 && f.t === me ? posOf(me) : f.card === 3 ? posOf(f.by === me ? f.t : f.by) : at); }
-  else if (f.note && f.card !== 4 && f.guess == null) put(esc(f.note), "", 0, f.t != null ? at : from);
-  if (f.show != null && f.card === 5) put(cardHTML(f.show, "mini"), "", 36);
-  if (f.card === 4) { const ring = el(`<div class="ring"></div>`); ring.style.left = from.x + "px"; ring.style.top = from.y + "px"; layer.append(ring); ring.animate([{ width: "20px", height: "20px", opacity: 1 }, { width: "120px", height: "120px", opacity: 0 }], { duration: 900, easing: "ease-out", fill: "forwards" }); put("侍女保护", "pink", 0, from); }
-  if (f.card === 6 && f.draw) { const dk = document.querySelector(".deck .card"); const d0 = dk ? dk.getBoundingClientRect() : null; for (let i = 0; i < f.draw; i++) { const b = el(`<div class="big">${backHTML("mini")}</div>`); layer.append(b); const x0 = d0 ? d0.left : cx, y0 = d0 ? d0.top : cy; b.animate([{ transform: `translate(${x0}px,${y0}px)`, opacity: 1 }, { transform: `translate(${from.x - 28 + i * 30}px,${from.y - 41}px)`, opacity: .9 }], { duration: 500, delay: i * 140, easing: "ease-out", fill: "forwards" }); } }
+  if (f.secret && f.secret[me] != null && (f.by === me || f.t === me)) { const v = f.secret[me]; put(`${f.card === K.KING ? "换到" : (f.card === K.BARON || f.card === K.WANG) ? "对方是" : "看到"} ${cardHTML(v, "mini")}`, "good", f.guess != null ? -40 : 0, f.card === K.KING && f.t === me ? posOf(me) : (f.card === K.BARON || f.card === K.WANG) ? posOf(f.by === me ? f.t : f.by) : at); }
+  else if (f.note && f.card !== K.MAID && f.guess == null) put(esc(f.note), "", 0, f.t != null ? at : from);
+  if (f.show != null && f.card === K.PRINCE) put(cardHTML(f.show, "mini"), "", 36);
+  if (f.card === K.MAID) { const ring = el(`<div class="ring"></div>`); ring.style.left = from.x + "px"; ring.style.top = from.y + "px"; layer.append(ring); ring.animate([{ width: "20px", height: "20px", opacity: 1 }, { width: "120px", height: "120px", opacity: 0 }], { duration: 900, easing: "ease-out", fill: "forwards" }); put("侍女保护", "pink", 0, from); }
+  if (f.card === K.DUKE && f.draw) { const dk = document.querySelector(".deck .card"); const d0 = dk ? dk.getBoundingClientRect() : null; for (let i = 0; i < f.draw; i++) { const b = el(`<div class="big">${backHTML("mini")}</div>`); layer.append(b); const x0 = d0 ? d0.left : cx, y0 = d0 ? d0.top : cy; b.animate([{ transform: `translate(${x0}px,${y0}px)`, opacity: 1 }, { transform: `translate(${from.x - 28 + i * 30}px,${from.y - 41}px)`, opacity: .9 }], { duration: 500, delay: i * 140, easing: "ease-out", fill: "forwards" }); } }
   for (const q of f.knocked || []) { await sleep(260); const kp = posOf(q); put("✖ 出局", "bad", -4, kp); const hb = el(`<div class="heartbreak">💔</div>`); hb.style.left = kp.x + "px"; hb.style.top = kp.y + "px"; layer.append(hb); hb.animate([{ transform: "translate(-50%,-50%) scale(.4)", opacity: 0 }, { transform: "translate(-50%,-130%) scale(1.3)", opacity: 1 }, { transform: "translate(-50%,-200%) scale(1)", opacity: 0 }], { duration: 1100, fill: "forwards" }); const se = seatEl(q); if (se) { se.classList.add("hit"); setTimeout(() => se.classList.remove("hit"), 600); } }
   await sleep(1150);
   // 4. 收尾：牌缩回出牌人的弃牌堆，结果标签淡出
@@ -221,7 +221,7 @@ async function playFx(f) {
 }
 
 /* ---------- 画面 ---------- */
-const cardHTML = (v, cls = "") => { const C = CARDS[v]; return `<div class="card c${v} ${cls}"><i class="fr"></i><span class="num">${v}</span><div class="art">${QSArt[v]}</div><div class="rib"><b>${C.name}</b></div><small>${G && G.sim ? G.sim.countOf(v) : (C.n || C.nx)} 张</small></div>`; };
+const cardHTML = (v, cls = "") => { const C = CARDS[v]; return `<div class="card c${v} ${cls}"><div class="pic" style="background-image:url(img/c${v}.webp)"></div><i class="fr"></i><span class="num">${v}</span><div class="rib"><b>${C.name}</b></div><small>${G && G.sim ? G.sim.countOf(v) : (C.n || C.nx)} 张</small></div>`; };
 const backHTML = (cls = "") => `<div class="card back ${cls}"><i class="fr"></i><div class="seal">情<br>书</div></div>`;
 const AU = (fn, ...a) => { try { window.QSAudio && QSAudio[fn](...a); } catch {} };
 document.addEventListener("click", e => { if (e.target.closest && e.target.closest("button")) AU("play", "tap"); }, true);
@@ -282,7 +282,7 @@ function render() {
   else if (myTurn) st.textContent = must ? "你必须打出皇后" : "轮到你了：点一张牌打出";
   else st.textContent = `等待${s.P[s.cur()].name}出牌…`;
   $("#hand").classList.toggle("myturn", (myTurn || keeping) && !mine.out);
-  $("#deckMode").textContent = s.ext ? "扩展 21 张" : "经典 16 张";
+  $("#deckMode").textContent = s.ext ? "扩展 22 张" : "经典 17 张";
   // 轮到我：震一下
   const turnKey = (myTurn || keeping) && !mine.out ? s.round + ":" + s.n : null;
   if (turnKey && G.vibKey !== turnKey) { G.vibKey = turnKey; if (navigator.vibrate) navigator.vibrate(120); }
@@ -338,8 +338,8 @@ function openPlay(card, i) {
     gs.innerHTML = `<div class="lbl">猜他的手牌是</div><div class="opts guess">${s.guessable().map(v => `<button class="opt c${v}" data-g="${v}"><span class="num">${v}</span>${CARDS[v].name}</button>`).join("")}</div>`;
     gs.querySelectorAll(".opt").forEach(b => b.onclick = () => { guess = +b.dataset.g; gs.querySelectorAll(".opt").forEach(x => x.classList.toggle("on", x === b)); upd(); });
   }
-  if (card === 9) body.querySelector("#tg").innerHTML = `<p class="note warn">打出公主你就立刻出局！真的要打吗？</p>`;
-  if (card === 6) body.querySelector("#tg").innerHTML = `<p class="note">打出后会从牌库摸 2 张，你再从 3 张里挑 1 张留下。</p>`;
+  if (card === K.PRINCESS) body.querySelector("#tg").innerHTML = `<p class="note warn">打出公主你就立刻出局！真的要打吗？</p>`;
+  if (card === K.DUKE) body.querySelector("#tg").innerHTML = `<p class="note">打出后会从牌库摸 2 张，你再从 3 张里挑 1 张留下。</p>`;
   upd();
   go.onclick = () => { send("play", { card, target, guess }); sh.close(); tutHit("send"); };
 }
@@ -398,12 +398,12 @@ $("#bLog").onclick = () => {
   const s = G.sim, lines = s.log.filter(l => l.vis === "all" || l.vis.includes(G.me)).filter(l => l.kind !== "turn").slice(-80).reverse();
   sheet("战报", el(`<ul class="log">${lines.map(l => `<li class="${l.kind}">${esc(l.text)}</li>`).join("") || "<li>还没有消息</li>"}</ul>`));
 };
-/* 八种角色一览：大牌面 + 效果 + 张数，随时能看 */
+/* 角色一览：大牌面 + 效果 + 张数，随时能看 */
 function openCards() {
   const s = G && G.sim, seen = {};
   if (s) { for (const q of s.order) for (const v of s.S[q].disc) seen[v] = (seen[v] || 0) + 1; for (const v of s.faceUp) seen[v] = (seen[v] || 0) + 1; }
   const vals = s ? s.values : Object.keys(CARDS).map(Number), nP = s ? s.nP : 4;
-  const body = el(`<div class="gallery"><p class="note">${s ? (s.ext ? "这局是 5–6 人的扩展牌组：21 张、10 种角色" : "这局是 4 人以下的经典牌组：16 张、8 种角色") : "4 人及以下用 16 张经典牌（8 种角色）；5–6 人用 21 张扩展牌，多了细作和国公。"}</p>
+  const body = el(`<div class="gallery"><p class="note">${s ? (s.ext ? "这局是 5–6 人的扩展牌组：22 张、11 种角色" : "这局是 4 人以下的经典牌组：17 张、9 种角色") : "4 人及以下用 17 张经典牌（9 种角色）；5–6 人用 22 张扩展牌，多了细作和国公。"}</p>
     ${vals.map(v => `<div class="gitem${s ? "" : (CARDS[v].n ? "" : " ext")}">${cardHTML(v)}<div><b class="c${v}">${v} · ${CARDS[v].name}</b>${!s && !CARDS[v].n ? '<span class="xtag">扩展牌组</span>' : ""}<p>${esc(CARDS[v].desc)}</p><small>${s ? `一共 ${s.countOf(v)} 张，已经打出 ${seen[v] || 0} 张` : `经典 ${CARDS[v].n} 张 · 扩展 ${CARDS[v].nx} 张`}</small></div></div>`).join("")}
     <p class="note">数字越大越尊贵：牌库摸空时，手里数字大的赢。${s ? "「已经打出」把别人弃掉的牌都算上了，用来推测剩下什么。" : ""}</p></div>`);
   sheet("角色一览", body);
@@ -415,7 +415,7 @@ async function startTutorial() { TUT.pending = true; const c = await LOCAL.creat
 /* ---------- 新手教程：在真实牌局里一步步教 ---------- */
 const TUT = { on: false, i: 0, pending: false };
 const TUT_STEPS = [
-  { text: "欢迎！4 人以下用 16 张牌、8 种角色（5–6 人是 21 张），<b>每人手里只有 1 张</b>。轮到你时先摸 1 张（变成 2 张），再打出 1 张。<br>下面这两张就是你的手牌。", target: "#hand" },
+  { text: "欢迎！4 人以下用 17 张牌、9 种角色（5–6 人是 22 张），<b>每人手里只有 1 张</b>。轮到你时先摸 1 张（变成 2 张），再打出 1 张。<br>下面这两张就是你的手牌。", target: "#hand" },
   { text: "上面是对手：左边扣着的是他的手牌，右边是他<b>最近弃掉的牌</b>。记住别人弃过什么，剩下的就好猜。", target: "#opps" },
   { text: "牌库开局会扣掉 1 张谁也不知道。两人局还会明放 3 张。牌库摸空时，还没出局的人比手牌，<b>数字大的赢</b>。", target: ".center" },
   { text: "每张牌左上角的数字就是它的大小，名字下面写着张数。想看所有角色的效果，随时点右上角的<b>「角色」</b>。<br>现在<b>点一张手牌</b>。", target: "#hand", wait: "open" },
@@ -451,10 +451,10 @@ function tutEnd(done) { clearInterval(TUT.timer); if (TUT.spot) TUT.spot.remove(
 
 function openHelp() {
   sheet("玩法说明", el(`<div class="help">
-    <p>你是王宫里的追求者，要把情书送到公主手里。<b>每人手里只有 1 张牌</b>。4 人及以下用 16 张经典牌（8 种角色）；5–6 人自动换成 21 张扩展牌（多了细作和国公，侍卫 6 张）。</p>
+    <p>你是王宫里的追求者，要把情书送到公主手里。<b>每人手里只有 1 张牌</b>。4 人及以下用 17 张经典牌（9 种角色）；5–6 人自动换成 22 张扩展牌（多了细作和国公，侍卫 6 张）。</p>
     <h4>怎么玩</h4><p>轮到你时先摸 1 张（手里 2 张），再打出 1 张，照着牌上的效果做。被淘汰就本轮出局。牌库摸完时，还没出局的人比手牌，<b>数字大的赢</b>；或者只剩一个人时他赢。赢一轮得一颗 ❤，两人局先集 7 颗、三人局 5 颗、四人局 4 颗、五六人局 3 颗的人获胜。</p>
-    <h4>十种牌</h4>${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(v => `<div class="hrow"><span class="hn c${v}">${v}</span><b>${CARDS[v].name}</b><span>×${CARDS[v].n}${CARDS[v].nx !== CARDS[v].n ? "/" + CARDS[v].nx : ""}</span><p>${esc(CARDS[v].desc)}</p></div>`).join("")}
-    <h4>小窍门</h4><p>记住别人弃过什么牌，剩下的牌就好猜了。侍女保护期间别人碰不了你。手里有太子或帝君时必须先打皇后，这常常会暴露你。公主永远别打出去。</p>
+    <h4>十一种牌</h4>${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(v => `<div class="hrow"><span class="hn c${v}">${v}</span><b>${CARDS[v].name}</b><span>×${CARDS[v].n}${CARDS[v].nx !== CARDS[v].n ? "/" + CARDS[v].nx : ""}</span><p>${esc(CARDS[v].desc)}</p></div>`).join("")}
+    <h4>小窍门</h4><p>记住别人弃过什么牌，剩下的牌就好猜了。侍女保护期间别人碰不了你。侯爷要拿大牌去比，亲王正相反——拿小牌去比，谁的牌大谁出局。手里有太子或帝君时必须先打皇后，这常常会暴露你。公主永远别打出去。</p>
     <h4>联机</h4><p>登录后创建房间，把 4 位房间号发给朋友，他们在首页输入就能加入。和苍澜·乱战用同一个账号。</p>
   </div>`));
 }
