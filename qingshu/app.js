@@ -5,7 +5,7 @@ const $ = s => document.querySelector(s);
 const el = h => { const t = document.createElement("template"); t.innerHTML = h.trim(); return t.content.firstElementChild; };
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 let ONLINE = null, LOCAL = new QSNet.LocalNet(), NET = null, G = null;
-const VERSION = "情书 v18 · 输牌翻开"; // 每次更新改一下，方便在手机上确认是不是新版
+const VERSION = "情书 v19 · 太子撕牌"; // 每次更新改一下，方便在手机上确认是不是新版
 for (const id of ["verA", "verH"]) { const e = document.getElementById(id); if (e) e.textContent = VERSION; }
 const show = id => document.querySelectorAll(".screen").forEach(s => s.hidden = s.id !== id);
 function toast(text, kind = "") { const box = $("#toasts"); const t = el(`<div class="toast ${kind}"></div>`); t.textContent = text; box.prepend(t); while (box.children.length > 3) box.lastChild.remove(); setTimeout(() => t.remove(), 3800); }
@@ -230,13 +230,29 @@ async function playFx(f) {
     for (const r of [rule, vs, els[f.by], els[f.t]]) r.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 260, fill: "forwards" });
     await sleep(280);
   }
+  // 2.6 太子：被弃掉的那张牌飞到中央亮给所有人看，然后从中间撕成两半
+  const torn = f.card === K.PRINCE && f.show != null && f.t != null;
+  if (torn) {
+    const w = 118, h = 172, fp = posOf(f.t), x = cx - w / 2, y = cy - h / 2;
+    big.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 220, fill: "forwards" }); cap.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 220, fill: "forwards" });
+    const who = el(`<div class="cap">${esc(f.t === me ? "我" : G.sim.P[f.t].name)} <i>被迫弃牌</i></div>`); who.style.top = y - 46 + "px"; layer.append(who);
+    // 左右两半是同一张牌的两份，各用锯齿形裁掉另一半
+    const L = "polygon(0 0,54% 0,46% 12%,56% 25%,45% 38%,55% 52%,46% 66%,56% 80%,47% 91%,53% 100%,0 100%)", R = "polygon(54% 0,100% 0,100% 100%,53% 100%,47% 91%,56% 80%,46% 66%,55% 52%,45% 38%,56% 25%,46% 12%)";
+    const halves = [L, R].map(cp => { const c = el(`<div class="big tear">${cardHTML(f.show)}</div>`); c.style.clipPath = cp; layer.append(c); return c; });
+    for (const c of halves) c.animate([{ transform: `translate(${fp.x - w / 2}px,${fp.y - h / 2}px) scale(.3)`, opacity: .2 }, { transform: `translate(${x}px,${y}px) scale(1)`, opacity: 1 }], { duration: 420, easing: "cubic-bezier(.2,.8,.3,1)", fill: "forwards" });
+    AU("play", "play"); await sleep(1250);
+    // 先抖两下，再撕开：两半各自向外、向下转着飞走
+    for (const c of halves) c.animate([{ transform: `translate(${x}px,${y}px) rotate(0)` }, { transform: `translate(${x - 3}px,${y}px) rotate(-2deg)` }, { transform: `translate(${x + 3}px,${y}px) rotate(2deg)` }, { transform: `translate(${x}px,${y}px) rotate(0)` }], { duration: 220 });
+    await sleep(230); AU("play", "hit");
+    halves.forEach((c, i) => { const d = i ? 1 : -1; c.animate([{ transform: `translate(${x}px,${y}px) rotate(0)`, opacity: 1 }, { transform: `translate(${x + d * 26}px,${y + 6}px) rotate(${d * 9}deg)`, opacity: 1, offset: .35 }, { transform: `translate(${x + d * 70}px,${y + 120}px) rotate(${d * 34}deg)`, opacity: 0 }], { duration: 900, easing: "cubic-bezier(.3,.1,.6,1)", fill: "forwards" }); });
+    await sleep(700); who.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 220, fill: "forwards" }); await sleep(220);
+  }
   // 3. 结果
   const at = f.t != null ? posOf(f.t) : from, res = [];
   const put = (html, cls, dy = 0, where = at) => { const r = el(`<div class="res ${cls}">${html}</div>`); r.style.left = Math.max(96, Math.min(innerWidth - 96, where.x)) + "px"; r.style.top = Math.max(70, where.y - 34 + dy) + "px"; layer.append(r); r.animate([{ opacity: 0, transform: "translate(-50%,-30%) scale(.6)" }, { opacity: 1, transform: "translate(-50%,-50%) scale(1)" }], { duration: 260, easing: "cubic-bezier(.2,.8,.3,1.3)", fill: "forwards" }); res.push(r); return r; };
   if (f.guess != null) put(`猜「${CARDS[f.guess].name}」${f.hit ? "" : " · 没猜中"}`, f.hit ? "good" : "");
   if (duel) {} else if (f.secret && f.secret[me] != null && (f.by === me || f.t === me)) { const v = f.secret[me]; put(`${f.card === K.KING ? "换到" : (f.card === K.BARON || f.card === K.WANG) ? "对方是" : "看到"} ${cardHTML(v, "mini")}`, "good", f.guess != null ? -40 : 0, f.card === K.KING && f.t === me ? posOf(me) : (f.card === K.BARON || f.card === K.WANG) ? posOf(f.by === me ? f.t : f.by) : at); }
   else if (f.note && f.card !== K.MAID && f.guess == null) put(esc(f.note), "", 0, f.t != null ? at : from);
-  if (f.show != null && f.card === K.PRINCE) put(cardHTML(f.show, "mini"), "", 36);
   if (f.moved && f.moved[me]) for (const [q, v] of f.moved[me]) put(`你知道的 ${cardHTML(v, "mini")} 到了${esc(G.sim.P[q].name)}手里`, "good", 0, posOf(q));
   if (f.card === K.MAID) { const ring = el(`<div class="ring"></div>`); ring.style.left = from.x + "px"; ring.style.top = from.y + "px"; layer.append(ring); ring.animate([{ width: "20px", height: "20px", opacity: 1 }, { width: "120px", height: "120px", opacity: 0 }], { duration: 900, easing: "ease-out", fill: "forwards" }); put("侍女保护", "pink", 0, from); }
   if (f.card === K.DUKE && f.draw) { const dk = document.querySelector(".deck .card"); const d0 = dk ? dk.getBoundingClientRect() : null; for (let i = 0; i < f.draw; i++) { const b = el(`<div class="big">${backHTML("mini")}</div>`); layer.append(b); const x0 = d0 ? d0.left : cx, y0 = d0 ? d0.top : cy; b.animate([{ transform: `translate(${x0}px,${y0}px)`, opacity: 1 }, { transform: `translate(${from.x - 28 + i * 30}px,${from.y - 41}px)`, opacity: .9 }], { duration: 500, delay: i * 140, easing: "ease-out", fill: "forwards" }); } }
@@ -245,7 +261,7 @@ async function playFx(f) {
   // 4. 收尾：牌缩回出牌人的弃牌堆，结果标签淡出
   const dp = f.by === me ? $("#me-disc") : document.querySelector(`.seat[data-p="${f.by}"] .dpile`); const dr = dp ? dp.getBoundingClientRect() : null;
   const tx = dr ? dr.left + dr.width / 2 : from.x, ty = dr ? dr.top + dr.height / 2 : from.y;
-  if (!duel) big.animate([{ transform: `translate(${cx - bw / 2}px,${cy - bh / 2}px) scale(1)`, opacity: 1 }, { transform: `translate(${tx - bw / 2}px,${ty - bh / 2}px) scale(.3)`, opacity: 0 }], { duration: 380, easing: "ease-in", fill: "forwards" });
+  if (!duel && !torn) big.animate([{ transform: `translate(${cx - bw / 2}px,${cy - bh / 2}px) scale(1)`, opacity: 1 }, { transform: `translate(${tx - bw / 2}px,${ty - bh / 2}px) scale(.3)`, opacity: 0 }], { duration: 380, easing: "ease-in", fill: "forwards" });
   for (const r of [cap, ...res, ...layer.querySelectorAll(".arrow,.ring")]) r.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, delay: 120, fill: "forwards" });
   await sleep(420); layer.innerHTML = "";
 }
