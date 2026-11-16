@@ -5,7 +5,7 @@ const $ = s => document.querySelector(s);
 const el = h => { const t = document.createElement("template"); t.innerHTML = h.trim(); return t.content.firstElementChild; };
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 let ONLINE = null, LOCAL = new QSNet.LocalNet(), NET = null, G = null;
-const VERSION = "情书 v17 · 比牌对决"; // 每次更新改一下，方便在手机上确认是不是新版
+const VERSION = "情书 v18 · 输牌翻开"; // 每次更新改一下，方便在手机上确认是不是新版
 for (const id of ["verA", "verH"]) { const e = document.getElementById(id); if (e) e.textContent = VERSION; }
 const show = id => document.querySelectorAll(".screen").forEach(s => s.hidden = s.id !== id);
 function toast(text, kind = "") { const box = $("#toasts"); const t = el(`<div class="toast ${kind}"></div>`); t.textContent = text; box.prepend(t); while (box.children.length > 3) box.lastChild.remove(); setTimeout(() => t.remove(), 3800); }
@@ -222,7 +222,11 @@ async function playFx(f) {
     await sleep(see ? 350 : 500);
     for (const q of [f.by, f.t]) { const tag = el(`<div class="tag ${lose === q ? "bad" : ""}">${!lose ? "平手" : lose === q ? "✖ 出局" : "胜"}</div>`); els[q].append(tag); if (lose) els[q].classList.add(lose === q ? "lose" : "win"); }
     AU("play", lose ? (lose === me ? "lose" : "hit") : "tap");
-    await sleep(see ? 1900 : 1300);
+    if (!see && lose) { // 旁观者：出局的那张牌反正要进弃牌堆，直接翻开给大家看；赢家的牌仍是牌背
+      await sleep(350); const cd = els[lose].querySelector(".card"); await cd.animate([{ transform: "scaleX(1)" }, { transform: "scaleX(0)" }], { duration: 150, fill: "forwards" }).finished;
+      const nw = el(cardHTML(vals[lose])); cd.replaceWith(nw); nw.animate([{ transform: "scaleX(0)" }, { transform: "scaleX(1)" }], { duration: 170, fill: "forwards" }); AU("play", "tap");
+    }
+    await sleep(see ? 1900 : 1700);
     for (const r of [rule, vs, els[f.by], els[f.t]]) r.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 260, fill: "forwards" });
     await sleep(280);
   }
