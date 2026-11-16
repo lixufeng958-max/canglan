@@ -5,7 +5,7 @@ const $ = s => document.querySelector(s);
 const el = h => { const t = document.createElement("template"); t.innerHTML = h.trim(); return t.content.firstElementChild; };
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 let ONLINE = null, LOCAL = new QSNet.LocalNet(), NET = null, G = null;
-const VERSION = "情书 v19 · 太子撕牌"; // 每次更新改一下，方便在手机上确认是不是新版
+const VERSION = "情书 v20 · 帝君换牌"; // 每次更新改一下，方便在手机上确认是不是新版
 for (const id of ["verA", "verH"]) { const e = document.getElementById(id); if (e) e.textContent = VERSION; }
 const show = id => document.querySelectorAll(".screen").forEach(s => s.hidden = s.id !== id);
 function toast(text, kind = "") { const box = $("#toasts"); const t = el(`<div class="toast ${kind}"></div>`); t.textContent = text; box.prepend(t); while (box.children.length > 3) box.lastChild.remove(); setTimeout(() => t.remove(), 3800); }
@@ -247,6 +247,23 @@ async function playFx(f) {
     halves.forEach((c, i) => { const d = i ? 1 : -1; c.animate([{ transform: `translate(${x}px,${y}px) rotate(0)`, opacity: 1 }, { transform: `translate(${x + d * 26}px,${y + 6}px) rotate(${d * 9}deg)`, opacity: 1, offset: .35 }, { transform: `translate(${x + d * 70}px,${y + 120}px) rotate(${d * 34}deg)`, opacity: 0 }], { duration: 900, easing: "cubic-bezier(.3,.1,.6,1)", fill: "forwards" }); });
     await sleep(700); who.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 220, fill: "forwards" }); await sleep(220);
   }
+  // 2.7 帝君：两张手牌飞到中间并排，左右对调，再各自飞到新主人那里。换牌的两人看得到牌面，其他人只看到牌背
+  const swap = f.card === K.KING && f.t != null && f.secret;
+  if (swap) {
+    const see = f.by === me || f.t === me, w = 96, h = 140, gap = 22, y = cy - h / 2, xl = cx - gap - w, xr = cx + gap;
+    const vals = [f.secret[f.t], f.secret[f.by]], ps = [f.by, f.t], P0 = ps.map(q => posOf(q)); // vals[i] = ps[i] 原来的手牌
+    big.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 220, fill: "forwards" }); cap.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 220, fill: "forwards" });
+    const nm = q => esc(q === me ? "我" : G.sim.P[q].name);
+    const rule = el(`<div class="cap">${nm(f.by)} <i>⇄</i> ${nm(f.t)} · 交换手牌</div>`); rule.style.top = y - 46 + "px"; layer.append(rule);
+    const cs = ps.map((q, i) => { const c = el(`<div class="big sd duel">${see ? cardHTML(vals[i]) : backHTML()}</div>`); layer.append(c);
+      c.animate([{ transform: `translate(${P0[i].x - w / 2}px,${P0[i].y - h / 2}px) scale(.4)`, opacity: .2 }, { transform: `translate(${i ? xr : xl}px,${y}px) scale(1)`, opacity: 1 }], { duration: 420, delay: i * 120, easing: "cubic-bezier(.2,.8,.3,1)", fill: "forwards" }); return c; });
+    AU("play", "play"); await sleep(see ? 1250 : 850);
+    // 对调：左边那张从上方绕到右边，右边那张从下方绕到左边
+    cs.forEach((c, i) => c.animate([{ transform: `translate(${i ? xr : xl}px,${y}px) scale(1)` }, { transform: `translate(${cx - w / 2}px,${y + (i ? 46 : -46)}px) scale(${i ? .92 : 1.08})`, offset: .5 }, { transform: `translate(${i ? xl : xr}px,${y}px) scale(1)` }], { duration: 620, easing: "ease-in-out", fill: "forwards" }));
+    AU("play", "tap"); await sleep(see ? 1100 : 800);
+    cs.forEach((c, i) => { const to = P0[1 - i]; c.animate([{ transform: `translate(${i ? xl : xr}px,${y}px) scale(1)`, opacity: 1 }, { transform: `translate(${to.x - w / 2}px,${to.y - h / 2}px) scale(.35)`, opacity: 0 }], { duration: 460, easing: "ease-in", fill: "forwards" }); });
+    rule.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, fill: "forwards" }); await sleep(480);
+  }
   // 3. 结果
   const at = f.t != null ? posOf(f.t) : from, res = [];
   const put = (html, cls, dy = 0, where = at) => { const r = el(`<div class="res ${cls}">${html}</div>`); r.style.left = Math.max(96, Math.min(innerWidth - 96, where.x)) + "px"; r.style.top = Math.max(70, where.y - 34 + dy) + "px"; layer.append(r); r.animate([{ opacity: 0, transform: "translate(-50%,-30%) scale(.6)" }, { opacity: 1, transform: "translate(-50%,-50%) scale(1)" }], { duration: 260, easing: "cubic-bezier(.2,.8,.3,1.3)", fill: "forwards" }); res.push(r); return r; };
@@ -261,7 +278,7 @@ async function playFx(f) {
   // 4. 收尾：牌缩回出牌人的弃牌堆，结果标签淡出
   const dp = f.by === me ? $("#me-disc") : document.querySelector(`.seat[data-p="${f.by}"] .dpile`); const dr = dp ? dp.getBoundingClientRect() : null;
   const tx = dr ? dr.left + dr.width / 2 : from.x, ty = dr ? dr.top + dr.height / 2 : from.y;
-  if (!duel && !torn) big.animate([{ transform: `translate(${cx - bw / 2}px,${cy - bh / 2}px) scale(1)`, opacity: 1 }, { transform: `translate(${tx - bw / 2}px,${ty - bh / 2}px) scale(.3)`, opacity: 0 }], { duration: 380, easing: "ease-in", fill: "forwards" });
+  if (!duel && !torn && !swap) big.animate([{ transform: `translate(${cx - bw / 2}px,${cy - bh / 2}px) scale(1)`, opacity: 1 }, { transform: `translate(${tx - bw / 2}px,${ty - bh / 2}px) scale(.3)`, opacity: 0 }], { duration: 380, easing: "ease-in", fill: "forwards" });
   for (const r of [cap, ...res, ...layer.querySelectorAll(".arrow,.ring")]) r.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, delay: 120, fill: "forwards" });
   await sleep(420); layer.innerHTML = "";
 }
