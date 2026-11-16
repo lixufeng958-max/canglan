@@ -5,7 +5,7 @@ const $ = s => document.querySelector(s);
 const el = h => { const t = document.createElement("template"); t.innerHTML = h.trim(); return t.content.firstElementChild; };
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 let ONLINE = null, LOCAL = new QSNet.LocalNet(), NET = null, G = null;
-const VERSION = "情书 v14 · 弃牌陈列"; // 每次更新改一下，方便在手机上确认是不是新版
+const VERSION = "情书 v15 · 弃牌列表"; // 每次更新改一下，方便在手机上确认是不是新版
 for (const id of ["verA", "verH"]) { const e = document.getElementById(id); if (e) e.textContent = VERSION; }
 const show = id => document.querySelectorAll(".screen").forEach(s => s.hidden = s.id !== id);
 function toast(text, kind = "") { const box = $("#toasts"); const t = el(`<div class="toast ${kind}"></div>`); t.textContent = text; box.prepend(t); while (box.children.length > 3) box.lastChild.remove(); setTimeout(() => t.remove(), 3800); }
@@ -208,6 +208,7 @@ async function playFx(f) {
   if (f.secret && f.secret[me] != null && (f.by === me || f.t === me)) { const v = f.secret[me]; put(`${f.card === K.KING ? "换到" : (f.card === K.BARON || f.card === K.WANG) ? "对方是" : "看到"} ${cardHTML(v, "mini")}`, "good", f.guess != null ? -40 : 0, f.card === K.KING && f.t === me ? posOf(me) : (f.card === K.BARON || f.card === K.WANG) ? posOf(f.by === me ? f.t : f.by) : at); }
   else if (f.note && f.card !== K.MAID && f.guess == null) put(esc(f.note), "", 0, f.t != null ? at : from);
   if (f.show != null && f.card === K.PRINCE) put(cardHTML(f.show, "mini"), "", 36);
+  if (f.moved && f.moved[me]) for (const [q, v] of f.moved[me]) put(`你知道的 ${cardHTML(v, "mini")} 到了${esc(G.sim.P[q].name)}手里`, "good", 0, posOf(q));
   if (f.card === K.MAID) { const ring = el(`<div class="ring"></div>`); ring.style.left = from.x + "px"; ring.style.top = from.y + "px"; layer.append(ring); ring.animate([{ width: "20px", height: "20px", opacity: 1 }, { width: "120px", height: "120px", opacity: 0 }], { duration: 900, easing: "ease-out", fill: "forwards" }); put("侍女保护", "pink", 0, from); }
   if (f.card === K.DUKE && f.draw) { const dk = document.querySelector(".deck .card"); const d0 = dk ? dk.getBoundingClientRect() : null; for (let i = 0; i < f.draw; i++) { const b = el(`<div class="big">${backHTML("mini")}</div>`); layer.append(b); const x0 = d0 ? d0.left : cx, y0 = d0 ? d0.top : cy; b.animate([{ transform: `translate(${x0}px,${y0}px)`, opacity: 1 }, { transform: `translate(${from.x - 28 + i * 30}px,${from.y - 41}px)`, opacity: .9 }], { duration: 500, delay: i * 140, easing: "ease-out", fill: "forwards" }); } }
   for (const q of f.knocked || []) { await sleep(260); const kp = posOf(q); put("✖ 出局", "bad", -4, kp); const hb = el(`<div class="heartbreak">💔</div>`); hb.style.left = kp.x + "px"; hb.style.top = kp.y + "px"; layer.append(hb); hb.animate([{ transform: "translate(-50%,-50%) scale(.4)", opacity: 0 }, { transform: "translate(-50%,-130%) scale(1.3)", opacity: 1 }, { transform: "translate(-50%,-200%) scale(1)", opacity: 0 }], { duration: 1100, fill: "forwards" }); const se = seatEl(q); if (se) { se.classList.add("hit"); setTimeout(() => se.classList.remove("hit"), 600); } }
@@ -246,7 +247,7 @@ function render() {
       <div class="nm"></div>
       <span class="hearts">${"❤".repeat(P.tokens)}<span class="dim">${"♡".repeat(Math.max(0, s.need - P.tokens))}</span></span>
       <div class="cards">${t.out ? `<div class="card mini gone">出局</div>` : known != null ? cardHTML(known, "mini known") : backHTML("mini")}</div>
-      <div class="dpile">${t.disc.length ? t.disc.map(v => cardHTML(v, "mini tiny")).join("") : `<div class="card mini tiny empty">弃</div>`}</div>
+      <div class="dpile${t.disc.length > 3 ? " many" : ""}">${t.disc.length ? t.disc.slice().reverse().map(v => `<span class="chip c${v}"><i>${v}</i>${CARDS[v].name}</span>`).join("") : `<span class="chip none">未弃牌</span>`}</div>
       ${t.out ? `<span class="badge outb">出局</span>` : t.safe ? `<span class="badge">侍女保护</span>` : cur ? `<span class="badge turn">思考中…</span>` : ""}</div>`);
     d.querySelector(".nm").textContent = P.name;
     d.onclick = () => openPlayer(p);

@@ -141,7 +141,9 @@ Sim.prototype.apply = function (ev) {
     }
     case K.KING: { const mine = s.hand[0], theirs = this.S[t].hand[0]; s.hand = [theirs]; this.S[t].hand = [mine];
       // 旁观者记得的牌跟着换手：原来知道 p 的现在知道 t，反之亦然
-      for (const q of this.order) { if (q === p || q === t) continue; const K = this.S[q].know, kp = K[p], kt = K[t]; delete K[p]; delete K[t]; if (kp != null) K[t] = kp; if (kt != null) K[p] = kt; } s.know[t] = mine; this.S[t].know[p] = theirs; F.secret = { [p]: theirs, [t]: mine }; F.note = "交换了手牌"; this.L(`${this.name(p)}和${this.name(t)}交换了手牌`, "all"); this.L(`你换到了「${CARDS[theirs].name}」`, [p], "secret"); this.L(`你换到了「${CARDS[mine].name}」`, [t], "secret"); break; }
+      for (const q of this.order) { if (q === p || q === t) continue; const K = this.S[q].know, kp = K[p], kt = K[t]; delete K[p]; delete K[t]; if (kp != null) K[t] = kp; if (kt != null) K[p] = kt;
+        const mv = []; if (kp != null) mv.push([t, kp]); if (kt != null) mv.push([p, kt]);
+        if (mv.length) { (F.moved = F.moved || {})[q] = mv; for (const [w, v] of mv) this.L(`你知道的那张「${CARDS[v].name}」现在到了${this.name(w)}手里`, [q], "secret"); } } s.know[t] = mine; this.S[t].know[p] = theirs; F.secret = { [p]: theirs, [t]: mine }; F.note = "交换了手牌"; this.L(`${this.name(p)}和${this.name(t)}交换了手牌`, "all"); this.L(`你换到了「${CARDS[theirs].name}」`, [p], "secret"); this.L(`你换到了「${CARDS[mine].name}」`, [t], "secret"); break; }
     case K.QUEEN: break;
     case K.PRINCESS: this.knock(p, "弃掉了公主"); break;
   }
