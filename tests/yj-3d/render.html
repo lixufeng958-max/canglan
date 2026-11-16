@@ -1,0 +1,53 @@
+<!doctype html><meta charset="utf-8"><body style="margin:0;background:#334"><canvas id="sheet"></canvas>
+<!-- 余烬·尸潮：把用户的 3D 模型（静态、无骨骼）按游戏的斜俯视镜头预渲染成角色图集。
+     模型没有骨骼，这里按几何位置给腿/手臂分组，绕髋/肩转动，做出走路、攻击、倒地的姿势。
+     用法见 tests/yj-3d/render.js -->
+<script type="importmap">{"imports":{"three":"./node_modules/three/build/three.module.js","three/addons/":"./node_modules/three/examples/jsm/"}}</script>
+<script type="module">
+import * as THREE from "three"; import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+const q = new URLSearchParams(location.search), name = q.get("m") || "zombie", D2R = Math.PI / 180;
+const CFG = {
+  hero: { file: "hero.glb", beta: 31, stride: 12, hipY: .50, delta: 32, pivot: [-.10, -.04], dirs: 24, U: 78,
+    legs: [{ hip: [-.18, .50, -.04], foot: [-.29, 0, -.06] }, { hip: [-.02, .50, -.04], foot: [.08, 0, .02] }], tip: [.34, .70, .17],
+    rows: [...Array(8).keys()].map(k => ({ walk: k / 8 })).concat([{}], [1, 2, 3, 4, 5, 6].map(k => ({ dead: k / 6 }))) },
+  zombie: { file: "zombie.glb", beta: 90, stride: 90, hipY: .42, delta: 46, pivot: [0, -.11], dirs: 16, U: 78,
+    legs: [{ hip: [-.10, .42, -.14], foot: [-.11, 0, -.46] }, { hip: [.05, .42, -.08], foot: [.01, 0, .02] }],
+    arms: [{ sh: [-.17, .74, .08], hand: [-.17, .47, .46] }, { sh: [.17, .74, .08], hand: [.19, .47, .46] }],
+    rows: [...Array(8).keys()].map(k => ({ walk: k / 8 })).concat([{ walk: .25, still: 1 }], [[25, 5], [36, 8], [-26, -14], [-10, -6]].map(([arm, lean]) => ({ walk: .25, still: 1, arm, lean })), [1, 2, 3, 4, 5, 6].map(k => ({ dead: k / 6 }))) }
+};
+const C = CFG[name], CELL = 112, RES = 1.25, CS = Math.round(CELL * RES), SSAA = 3, PHI = 50 * D2R, sm = (a, b, x) => { const t = Math.max(0, Math.min(1, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const rd = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true }); rd.setSize(CS * SSAA, CS * SSAA, false); rd.setClearColor(0, 0); rd.outputColorSpace = THREE.SRGBColorSpace;
+const scene = new THREE.Scene(); scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x3a3a34, 2.0)); const key = new THREE.DirectionalLight(0xfff4e0, 2.4); key.position.set(-2.5, 5, 3); scene.add(key); const rim = new THREE.DirectionalLight(0x9fc0ff, .9); rim.position.set(3, 2, -3); scene.add(rim);
+const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, .1, 30); cam.position.set(0, Math.sin(PHI) * 8, Math.cos(PHI) * 8); cam.lookAt(0, 0, 0);
+new GLTFLoader().load(C.file, g => { let mesh; g.scene.traverse(o => { if (o.isMesh) mesh = o; }); scene.add(g.scene); if (mesh.material) { mesh.material.metalness = 0; mesh.material.roughness = .85; }
+  const geo = mesh.geometry, P0 = geo.attributes.position.array.slice(), N0 = geo.attributes.normal.array.slice(), n = P0.length / 3, P = geo.attributes.position.array, N = geo.attributes.normal.array;
+  const sa = C.stride * D2R, sx = Math.cos(sa), sz = Math.sin(sa); // 迈步方向（模型水平面内）
+  // —— 给每个顶点分组：属于哪条腿 / 哪只手臂，权重多少 ——
+  const WL = new Float32Array(n), LI = new Uint8Array(n), WA = new Float32Array(n), AI = new Uint8Array(n);
+  for (let i = 0; i < n; i++) { const x = P0[i * 3], y = P0[i * 3 + 1], z = P0[i * 3 + 2]; let wa = 0;
+    if (C.arms) for (let k = 0; k < 2; k++) { const A = C.arms[k], dx = A.hand[0] - A.sh[0], dy = A.hand[1] - A.sh[1], dz = A.hand[2] - A.sh[2], L2 = dx * dx + dy * dy + dz * dz, t = ((x - A.sh[0]) * dx + (y - A.sh[1]) * dy + (z - A.sh[2]) * dz) / L2, tc = Math.max(0, Math.min(1.25, t)), d = Math.hypot(x - A.sh[0] - dx * tc, y - A.sh[1] - dy * tc, z - A.sh[2] - dz * tc), w = (1 - sm(.08, .13, d)) * sm(.04, .3, t); if (w > wa) { wa = w; AI[i] = k; } }
+    WA[i] = wa; let best = 1e9; for (let k = 0; k < 2; k++) { const Lg = C.legs[k], t = Math.max(0, Math.min(1, (Lg.hip[1] - y) / Lg.hip[1])), cx = Lg.hip[0] + (Lg.foot[0] - Lg.hip[0]) * t, cz = Lg.hip[2] + (Lg.foot[2] - Lg.hip[2]) * t, d = Math.hypot(x - cx, z - cz); if (d < best) { best = d; LI[i] = k; } }
+    WL[i] = (1 - sm(C.hipY - .10, C.hipY + .03, y)) * (1 - wa) * (best < .2 ? 1 : 0); }
+  const rot = (i, J, ang, w) => { if (!w) return; const c = Math.cos(ang), s = Math.sin(ang), dx = P[i * 3] - J[0], dy = P[i * 3 + 1] - J[1], dz = P[i * 3 + 2] - J[2], ds = dx * sx + dz * sz, dl = -dx * sz + dz * sx, ds2 = ds * c - dy * s, dy2 = ds * s + dy * c, nx = J[0] + ds2 * sx - dl * sz, ny = J[1] + dy2, nz = J[2] + ds2 * sz + dl * sx;
+    P[i * 3] += (nx - P[i * 3]) * w; P[i * 3 + 1] += (ny - P[i * 3 + 1]) * w; P[i * 3 + 2] += (nz - P[i * 3 + 2]) * w;
+    const ax = N[i * 3], ay = N[i * 3 + 1], az = N[i * 3 + 2], as = ax * sx + az * sz, al = -ax * sz + az * sx, as2 = as * c - ay * s, ay2 = as * s + ay * c; N[i * 3] += (as2 * sx - al * sz - ax) * w; N[i * 3 + 1] += (ay2 - ay) * w; N[i * 3 + 2] += (as2 * sz + al * sx - az) * w; };
+  function poseTo(o) { P.set(P0); N.set(N0); const ph = (o.walk || 0) * 2 * Math.PI, d = C.delta * D2R, sw = (1 - Math.cos(ph)) / 2, legA = [d * sw, -d * sw], dead = o.dead || 0, lean = (o.lean || 0) * D2R, arm = (o.arm || 0) * D2R;
+    const lift = [Math.max(0, Math.sin(ph)) * .035, Math.max(0, -Math.sin(ph)) * .035], asw = C.arms ? [Math.sin(ph) * 7 * D2R + arm, -Math.sin(ph) * 7 * D2R + arm] : null, pel = [C.pivot[0], C.hipY, C.pivot[1]];
+    for (let i = 0; i < n; i++) { const k = LI[i], wl = WL[i]; if (wl) { rot(i, C.legs[k].hip, legA[k] * (1 - dead * .6), wl); P[i * 3 + 1] += lift[k] * wl * (1 - dead); }
+      if (WA[i]) rot(i, C.arms[AI[i]].sh, asw[AI[i]] + dead * 55 * D2R, WA[i]);
+      if (lean) rot(i, pel, lean, sm(C.hipY - .03, C.hipY + .12, P0[i * 3 + 1]) * (1 - wl)); }
+    let ymin = 1e9; for (let i = 0; i < n; i += 3) if (P[i * 3 + 1] < ymin) ymin = P[i * 3 + 1];
+    if (dead) { const a = dead * dead * 86 * D2R, J = [C.pivot[0] - sx * .12, ymin, C.pivot[1] - sz * .12]; for (let i = 0; i < n; i++) rot(i, J, a, 1); ymin = 1e9; for (let i = 0; i < n; i += 3) if (P[i * 3 + 1] < ymin) ymin = P[i * 3 + 1]; } // 向后仰倒
+    for (let i = 0; i < n; i++) P[i * 3 + 1] -= ymin; geo.attributes.position.needsUpdate = true; geo.attributes.normal.needsUpdate = true; geo.computeBoundingSphere(); }
+  const sheet = document.getElementById("sheet"); sheet.width = C.dirs * CS; sheet.height = C.rows.length * CS; const sg = sheet.getContext("2d"); sg.imageSmoothingQuality = "high";
+  const meta = { cs: CS, cell: CELL, dirs: C.dirs, rows: C.rows.length, U: C.U, off: [], muz: [] }, half = CELL / 2 / C.U, cp = Math.cos(PHI), sp = Math.sin(PHI), beta = C.beta * D2R;
+  mesh.frustumCulled = false; const root = g.scene;
+  C.rows.forEach((o, r) => { poseTo(o); const offs = [];
+    for (let c = 0; c < C.dirs; c++) { const a = c / C.dirs * 2 * Math.PI, rho = beta - a, cr = Math.cos(rho), sr = Math.sin(rho); root.rotation.y = rho; const px = C.pivot[0], pz = C.pivot[1]; root.position.set(-(px * cr + pz * sr), 0, -(-px * sr + pz * cr)); root.updateMatrixWorld(true);
+      let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9; for (let i = 0; i < n; i += 11) { const x = P[i * 3], y = P[i * 3 + 1], z = P[i * 3 + 2], X = x * cr + z * sr + root.position.x, Z = -x * sr + z * cr + root.position.z, sy = y * cp - Z * sp; if (X < x0) x0 = X; if (X > x1) x1 = X; if (sy < y0) y0 = sy; if (sy > y1) y1 = sy; }
+      const bx = (x0 + x1) / 2, by = (y0 + y1) / 2; cam.left = bx - half; cam.right = bx + half; cam.top = by + half; cam.bottom = by - half; cam.updateProjectionMatrix(); rd.render(scene, cam);
+      sg.drawImage(rd.domElement, c * CS, r * CS, CS, CS); offs.push([Math.round(bx * C.U * 10) / 10, Math.round(-by * C.U * 10) / 10]);
+      if (r === 8 && C.tip) { const x = C.tip[0], y = C.tip[1], z = C.tip[2], X = x * cr + z * sr + root.position.x, Z = -x * sr + z * cr + root.position.z; meta.muz.push([Math.round(X * C.U * 10) / 10, Math.round(-(y * cp - Z * sp) * C.U * 10) / 10]); } }
+    meta.off.push(offs); });
+  window.result = { meta, png: sheet.toDataURL("image/png") }; }, undefined, e => { window.err = String(e); });
+</script>

@@ -19,7 +19,7 @@ Rn.resize = function () {
 const el = (c, x, y, rx, ry, rot) => { c.beginPath(); c.ellipse(x, y, rx, ry, rot || 0, 0, TAU); c.fill(); };
 const circ = (c, x, y, r) => { c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); };
 Rn.build = function (L) {
-  CELLS = new Map();
+  CELLS = new Map(); M3.tint.clear();
   const { W, H, g, th } = L, seed = (L.i + 1) * 977, theme = L.def.theme;
   const f = Rn.floor = document.createElement("canvas"), t = Rn.top = document.createElement("canvas"); f.width = t.width = W * T; f.height = t.height = H * T;
   const c = f.getContext("2d"), tc = t.getContext("2d"), at = (x, y) => x < 0 || y < 0 || x >= W || y >= H ? 1 : g[y * W + x];
@@ -348,14 +348,49 @@ function cell(type, v, k, f) { const key = type + v + "_" + k + "_" + f; let c =
   CELLS.set(key, c); return c; }
 function dirK(ang) { let a = ((ang % TAU) + TAU + Math.PI) % TAU - Math.PI, flip = false; if (Math.cos(a) < -1e-6) { a = Math.PI - a; if (a > Math.PI) a -= TAU; flip = true; } return [Math.max(0, Math.min(8, Math.round((a + Math.PI / 2) / (Math.PI / 8)))), flip]; }
 /* 尸体：6 帧倒地 + 血泊扩散；疯跑者倒地后还会抽搐。c 可以是地面图（烙进去永久保留） */
-function drawBody(c, b, k6, jx) { if (!b.key) return drawCorpse(c, b, Math.min(1, k6 / 3), 0); const [k, flip] = dirK(b.face), cl = cell(b.key, b.sv, k, 14 + k6), CL = cl.CL, d = k6 / 6, r = b.r, bx = -Math.cos(b.face) * r * 1.1 * d, by = -Math.sin(b.face) * r * .8 * d;
+/* ---------- 3D 模型角色 ----------
+   用户提供了两个 3D 模型（主角士兵、丧尸，各 30 多万面、无骨骼）。手机上没法实时渲染，所以用 tests/yj-3d/ 按游戏的斜俯视镜头
+   把它们从各个朝向、各个动作预先渲染成图集（m3d/hero.png、m3d/zombie.png，每格的偏移在 m3d/*.js 里），游戏里按朝向和动作取格子画。
+   主角：24 个朝向 ×（走路 8 帧 + 站立 + 倒地 6 帧）；丧尸：16 个朝向 ×（走路 8 + 站立 + 攻击 4 + 倒地 6）。
+   大部分丧尸共用这个丧尸模型，靠换色和缩放区分；爬行者仍用原来的画法。 */
+const M3 = { ok: false, img: {}, tint: new Map() };
+const Z3 = { walker: { k: 1 }, runner: { k: .93, tint: "#f0cdbb" }, spitter: { k: 1, tint: "#bfe98a" }, bloater: { k: 1.32, wx: 1.28, tint: "#aecf96" }, brute: { k: 1.55, tint: "#a3b0c8" }, elite: { k: 1.65, tint: "#f3d6d6" }, elite2: { k: 1.65, tint: "#dd8676" }, boss: { k: 2.1, tint: "#c6a6f4" } };
+(function () { const D = YJ.M3D; if (!D || !D.hero || !D.zombie) return; let left = 2; for (const n of ["hero", "zombie"]) { const im = new Image(); im.onload = () => { M3.img[n] = im; if (--left === 0) M3.ok = true; }; im.src = "m3d/" + n + ".png"; } })();
+/* 取一格（可带换色）。换色的格子用到才生成，换关时清掉 */
+function m3cell(name, row, col, tint) { const D = YJ.M3D[name], cs = D.cs, im = M3.img[name]; if (!tint) return [im, col * cs, row * cs];
+  const key = tint + row + "_" + col; let cv = M3.tint.get(key); if (!cv) { if (M3.tint.size > 700) M3.tint.clear(); cv = document.createElement("canvas"); cv.width = cv.height = cs; const g = cv.getContext("2d"); g.drawImage(im, col * cs, row * cs, cs, cs, 0, 0, cs, cs); g.globalCompositeOperation = "multiply"; g.fillStyle = tint; g.fillRect(0, 0, cs, cs); g.globalCompositeOperation = "destination-in"; g.drawImage(im, col * cs, row * cs, cs, cs, 0, 0, cs, cs); M3.tint.set(key, cv); } return [cv, 0, 0]; }
+function m3draw(c, name, row, col, x, y, k, tint, wx, white, alpha) { const D = YJ.M3D[name], cs = D.cs, o = D.off[row][col], w = D.cell * k, q = m3cell(name, row, col, tint), dx = x + o[0] * k * (wx || 1) - w * (wx || 1) / 2, dy = y + o[1] * k - w / 2;
+  if (alpha != null) c.globalAlpha = alpha; c.drawImage(q[0], q[1], q[2], cs, cs, dx, dy, w * (wx || 1), w);
+  if (white) { c.globalCompositeOperation = "lighter"; c.globalAlpha = white; c.drawImage(q[0], q[1], q[2], cs, cs, dx, dy, w * (wx || 1), w); c.drawImage(q[0], q[1], q[2], cs, cs, dx, dy, w * (wx || 1), w); c.globalCompositeOperation = "source-over"; } c.globalAlpha = 1; }
+const m3dir = (a, n) => ((Math.round(a / (TAU / n)) % n) + n) % n;
+function m3shadow(c, x, y, r) { const g = c.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, "rgba(0,0,0,.5)"); g.addColorStop(.6, "rgba(0,0,0,.28)"); g.addColorStop(1, "rgba(0,0,0,0)"); c.save(); c.translate(x, y); c.scale(1, .5); c.translate(-x, -y); c.fillStyle = g; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); c.restore(); }
+function drawPlayer3(c, pl, S, time) { const D = YJ.M3D.hero, dead = G.state === "dead"; if (dead) pl.deadT = pl.deadT === undefined ? time : pl.deadT; else pl.deadT = undefined;
+  const still = gait(pl, 60 * (pl.dashT > 0 ? .5 : 1), dead), col = m3dir(pl.va, D.dirs), row = dead ? 8 + Math.min(6, Math.ceil((time - pl.deadT) / .1 + .01)) : still && pl.dashT <= 0 ? 8 : Math.floor((pl.gp || 0) * 8) & 7;
+  const hit = pl.hurtT > .2, rec = pl.flashT > 0 && !S.B.flame ? 2 : 0, a = col / D.dirs * TAU, x = pl.x - Math.cos(a) * rec, y = pl.y - Math.sin(a) * rec * .7;
+  if (dead) { const dk = (row - 8) / 6; c.fillStyle = "rgba(70,6,6,.85)"; el(c, pl.x - Math.cos(a) * 16 * dk, pl.y - Math.sin(a) * 12 * dk, 26 * dk, 16 * dk, a); }
+  m3shadow(c, pl.x, pl.y + 2, 20); m3draw(c, "hero", row, col, x, y, 1, null, 1, hit ? .6 : 0);
+  const mz = D.muz[col]; Rn.muz = { x: x + mz[0], y: y + mz[1], a: Math.atan2(Math.sin(a) * .77, Math.cos(a)) };
+  if (pl.flashT > 0 && !S.B.flame && !dead) { c.save(); c.translate(Rn.muz.x, Rn.muz.y); c.rotate(Rn.muz.a); const g = c.createRadialGradient(5, 0, 0, 5, 0, 22); g.addColorStop(0, "rgba(255,252,235,1)"); g.addColorStop(.3, "rgba(255,210,90,.9)"); g.addColorStop(.65, "rgba(255,110,30,.5)"); g.addColorStop(1, "rgba(200,40,10,0)"); c.fillStyle = g; c.beginPath(); c.moveTo(0, 0); c.lineTo(12, -9); c.lineTo(10, -2); c.lineTo(30, 0); c.lineTo(10, 2); c.lineTo(12, 9); c.closePath(); c.fill(); c.restore(); } }
+function drawEnemy3(c, e, time, pl) { const key = eKey(e), V = Z3[key], D = YJ.M3D.zombie, k = V.k, fl = e.flash > 0, still = gait(e, 72 * k, e.stag > 0 || e.st === "wind"), pw = e.st === "wind" ? 1 - e.w / e.tele.t : 0;
+  const row = e.st === "wind" && e.tele.type !== "leap" ? 9 + Math.min(1, Math.floor(pw * 2)) : e.atk > 0 ? 9 + Math.min(3, Math.floor((1 - e.atk / .32) * 4)) : still ? 8 : Math.floor((e.gp || 0) * 8) & 7, col = m3dir(e.ang, D.dirs); // 攻击 4 帧 / 站立 / 走路 8 帧
+  const tk = Math.floor(time * 9), jx = e.awake && h2(tk, (e.v * 997) | 0, 3) > .88 ? (h2(tk, 5, (e.v * 99) | 0) - .5) * 2.5 : 0, bk = fl ? 2.5 : e.stag > 0 ? 1.2 : 0; // 偶尔抽搐；受击时往后顿一下
+  m3shadow(c, e.x, e.y + 2, e.r * 1.35); m3draw(c, "zombie", row, col, e.x + jx - Math.cos(e.ang) * bk, e.y - Math.sin(e.ang) * bk, k, V.tint, V.wx, fl ? .65 : 0); e._eyes = null;
+  const top = 58 * k; if (e.type === "spitter" && e.cd < .9 && !fl) { const ch = 1 - Math.max(0, e.cd) / .9; c.fillStyle = `rgba(200,255,110,${.4 + ch * .4})`; circ(c, e.x + Math.cos(e.ang) * 12, e.y - 34 + Math.sin(e.ang) * 9, 3 + ch * 4.5); }
+  if (e.burn > 0) { c.fillStyle = "rgba(255,140,40,.45)"; circ(c, e.x, e.y - 24 * k, e.r * .9); }
+  if (e.slow > 0) { c.strokeStyle = "rgba(140,220,255,.8)"; c.lineWidth = 1.5; c.beginPath(); c.ellipse(e.x, e.y, e.r, e.r * .6, 0, 0, TAU); c.stroke(); }
+  if (e.hp < e.maxhp && !e.E.elite) { const w = Math.max(20, e.r * 1.6); c.fillStyle = "rgba(0,0,0,.7)"; c.fillRect(e.x - w / 2 - 1, e.y - top - 5, w + 2, 4); c.fillStyle = "#b3261c"; c.fillRect(e.x - w / 2, e.y - top - 4, w * Math.max(0, e.hp / e.maxhp), 2); } }
+function drawBody3(c, b, k6, jx) { const key = b.key || "boss", V = Z3[key], D = YJ.M3D.zombie, k = V.k, col = m3dir(b.face, D.dirs), d = k6 / 6, r = b.r, bx = -Math.cos(b.face) * r * 1.3 * d, by = -Math.sin(b.face) * r * 1.0 * d;
+  c.fillStyle = "rgba(64,6,6,.82)"; el(c, b.x + bx, b.y + by, r * 1.9 * d, r * 1.25 * d, b.v * 3); el(c, b.x + bx * 1.8 + r * .5, b.y + by * 1.6 + r * .3, r * .8 * d, r * .5 * d, b.v * 5);
+  m3draw(c, "zombie", 12 + k6, col, b.x + (jx || 0), b.y, k, V.tint, V.wx, 0, k6 >= 6 ? .92 : 1); }
+function drawBody(c, b, k6, jx) { if (M3.ok && b.key !== "crawler") return drawBody3(c, b, k6, jx); if (!b.key) return drawCorpse(c, b, Math.min(1, k6 / 3), 0); const [k, flip] = dirK(b.face), cl = cell(b.key, b.sv, k, 14 + k6), CL = cl.CL, d = k6 / 6, r = b.r, bx = -Math.cos(b.face) * r * 1.1 * d, by = -Math.sin(b.face) * r * .8 * d;
   c.fillStyle = "rgba(64,6,6,.82)"; el(c, b.x + bx, b.y + by, r * 1.9 * d, r * 1.25 * d, b.v * 3); el(c, b.x + bx * 1.8 + r * .5, b.y + by * 1.6 + r * .3, r * .8 * d, r * .5 * d, b.v * 5); el(c, b.x + bx * .4 - r * .9 * d, b.y + by + r * .5 * d, r * .5 * d, r * .32 * d, 1);
   c.save(); c.translate(b.x + (jx || 0), b.y); if (flip) c.scale(-1, 1); c.drawImage(cl.cv, -CL / 2, -CL * .74, CL, CL); c.restore(); }
 function gait(o, cyc, hold) { const mv = Math.hypot(o.x - (o._lx === undefined ? o.x : o._lx), o.y - (o._ly === undefined ? o.y : o._ly)); o._lx = o.x; o._ly = o.y; if (mv > .04 && mv < 30 && !hold) { o.gp = ((o.gp || 0) + mv / cyc) % 1; o.still = 0; } else if (!G.pausedDraw) o.still = (o.still || 0) + 1; return o.still > 7; }
 /* 影子：椭圆，朝背光方向偏移拉长；身体起伏时略微缩放 */
 function shadow(c, x, y, r, ang, k, sm) { c.save(); c.translate(x + Math.cos(ang) * r * .7 * k, y + Math.sin(ang) * r * .7 * k); c.rotate(ang); c.fillStyle = "rgba(0,0,0,.5)"; c.beginPath(); c.ellipse(0, 0, r * (.85 + .6 * k) * sm, r * .5 * sm, 0, 0, TAU); c.fill(); c.restore(); }
-Rn.figure = figure;
+Rn.figure = figure; Rn.M3 = M3;
 function drawPlayer(c, pl, S, time) {
+  if (M3.ok) return drawPlayer3(c, pl, S, time);
   const dead = G.state === "dead"; if (dead) pl.deadT = pl.deadT === undefined ? time : pl.deadT; else pl.deadT = undefined;
   const dk = dead ? Math.min(6, Math.ceil((time - pl.deadT) / .1 + .01)) / 6 : 0; // 死亡 6 帧：后仰倒地
   const stand = (gait(pl, CYC("player"), pl.dashT > 0 || dead) && pl.dashT <= 0) || dead, p = pl.dashT > 0 ? (pl.dashT * 7) % 1 : pl.gp || 0;
@@ -370,6 +405,7 @@ function drawPlayer(c, pl, S, time) {
 }
 function eKey(e) { return e.type === "elite" ? (e.look === "brute" ? "elite2" : "elite") : e.type; }
 function drawEnemy(c, e, time, pl) {
+  if (M3.ok && e.type !== "crawler") return drawEnemy3(c, e, time, pl);
   const E = e.E, r = e.r, fl = e.flash > 0, t = e.type; let top = -r - 16;
   if (t === "boss") { shadow(c, e.x, e.y, r, Math.atan2(e.y - pl.y, e.x - pl.x), 1, 1); const k = r / 13, C = x => fl ? "#fff" : x; c.save(); c.translate(e.x, e.y - 10); c.scale(1, .8); c.rotate(e.ang); c.scale(k, k); c.lineCap = "round";
     for (let i = 0; i < 6; i++) { const a = i / 6 * TAU + Math.sin(time * 2 + i) * .3, p = [Math.cos(a) * 8, Math.sin(a) * 8, Math.cos(a + .5) * 18, Math.sin(a + .5) * 18, Math.cos(a + Math.sin(time * 3 + i) * .6) * 24, Math.sin(a + Math.sin(time * 3 + i) * .6) * 24]; for (const [col, w] of [[OUTC, 5.2], [C("#5a3f6a"), 3.4]]) { c.strokeStyle = col; c.lineWidth = w; c.beginPath(); c.moveTo(p[0], p[1]); c.quadraticCurveTo(p[2], p[3], p[4], p[5]); c.stroke(); } }
@@ -462,7 +498,7 @@ Rn.draw = function (time) {
   // —— 发光的东西画在黑暗之上：曳光弹、火光、爆炸、红眼、掉落光柱 ——
   c.setTransform(dpr * sc, 0, 0, dpr * sc, ox * dpr * sc, oy * dpr * sc); c.globalCompositeOperation = "lighter"; c.lineCap = "round";
   for (const l of Rn.reds) if (vis(l.x, l.y, 60)) { const a = .16 + Math.sin(time * 3 + l.f) * .1, g = c.createRadialGradient(l.x, l.y + 10, 0, l.x, l.y + 10, 60); g.addColorStop(0, `rgba(255,30,20,${a})`); g.addColorStop(1, "rgba(255,30,20,0)"); c.fillStyle = g; c.fillRect(l.x - 60, l.y - 50, 120, 120); }
-  for (const b0 of L.bul) { if (b0.flame || b0.gren || b0.enemy) continue; const b = { x: b0.x, y: b0.y - 30, vx: b0.vx, vy: b0.vy, ex: b0.ex, crit: b0.crit }, l = Math.hypot(b.vx, b.vy), k = (b.ex ? 16 : 46) / l, x0 = b.x - b.vx * k, y0 = b.y - b.vy * k, g = c.createLinearGradient(x0, y0, b.x, b.y), col = b.ex ? "255,140,50" : b.crit ? "255,240,170" : "255,205,110"; g.addColorStop(0, `rgba(${col},0)`); g.addColorStop(1, `rgba(${col},.9)`);
+  for (const b0 of L.bul) { if (b0.flame || b0.gren || b0.enemy) continue; const b = { x: b0.x, y: b0.y - 34, vx: b0.vx, vy: b0.vy, ex: b0.ex, crit: b0.crit }, l = Math.hypot(b.vx, b.vy), k = (b.ex ? 16 : 46) / l, x0 = b.x - b.vx * k, y0 = b.y - b.vy * k, g = c.createLinearGradient(x0, y0, b.x, b.y), col = b.ex ? "255,140,50" : b.crit ? "255,240,170" : "255,205,110"; g.addColorStop(0, `rgba(${col},0)`); g.addColorStop(1, `rgba(${col},.9)`);
     c.strokeStyle = g; c.lineWidth = b.ex ? 6 : 3.4; c.beginPath(); c.moveTo(x0, y0); c.lineTo(b.x, b.y); c.stroke(); c.strokeStyle = "rgba(255,255,240,.95)"; c.lineWidth = b.ex ? 2.4 : 1.1; c.beginPath(); c.moveTo(b.x - b.vx * k * .3, b.y - b.vy * k * .3); c.lineTo(b.x, b.y); c.stroke(); }
   if (pl.flashT > 0 && !S.B.flame && Rn.muz) { const mx = Rn.muz.x, my = Rn.muz.y, g = c.createRadialGradient(mx, my, 0, mx, my, 150); g.addColorStop(0, "rgba(255,190,90,.38)"); g.addColorStop(1, "rgba(255,120,20,0)"); c.fillStyle = g; c.fillRect(mx - 150, my - 150, 300, 300); }
   for (const p of L.parts) if (p.glow) { c.globalAlpha = Math.min(1, p.life / p.max * 1.5); c.fillStyle = p.c; c.fillRect(p.x - p.s / 2, p.y - p.s / 2, p.s, p.s); } c.globalAlpha = 1;
