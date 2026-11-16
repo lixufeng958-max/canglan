@@ -165,46 +165,88 @@ Sim.prototype.keep = function (p, card) {
 };
 Sim.prototype.run = function (events) { for (const e of events) this.apply(e); };
 
-/* ---------- 电脑 ---------- */
+/* ---------- 电脑 ----------
+ * 只用它自己看得到的信息：自己的手牌、所有弃牌、两人局明牌、偷看/比牌/换牌得知的牌（s.know），
+ * 以及场上公开的出牌记录（sim.fx）能推出来的东西。先估每个对手手里各种牌的可能性，再给手里两张牌各打一个分。 */
+/* 推断每个对手的手牌：返回 { 玩家: { 牌值: 概率 } } */
+function botRead(sim, pid) {
+  const me = sim.S[pid], vals = sim.values;
+  // 公开记录推出的限制：某人的牌「不是 X」「比 X 大」「比 X 小」；他自己再出一次牌后就作废（留下的可能是新摸的）
+  const cons = {}; const fresh = () => ({ not: {}, gt: -1, lt: 99, royal: false }); for (const q of sim.order) cons[q] = fresh();
+  for (const f of sim.fx) {
+    if (f.round !== sim.round || f.kind === "showdown" || f.by == null) continue;
+    cons[f.by] = fresh();
+    if (f.card === K.QUEEN) cons[f.by].royal = true; // 打皇后的人，手里多半是太子、帝君或公主
+    if (f.t == null) continue;
+    if (f.card === K.GUARD && f.guess != null && !f.hit) cons[f.t].not[f.guess] = 1;
+    else if (f.card === K.PRINCE) cons[f.t] = fresh();
+    else if (f.card === K.KING) { const x = cons[f.by]; cons[f.by] = cons[f.t]; cons[f.t] = x; }
+    else if ((f.card === K.BARON || f.card === K.WANG) && f.knocked && f.knocked.length === 1) {
+      const lose = f.knocked[0], win = lose === f.by ? f.t : f.by, d = sim.S[lose].disc, lv = d[d.length - 1];
+      if (f.card === K.BARON) cons[win].gt = Math.max(cons[win].gt, lv); else cons[win].lt = Math.min(cons[win].lt, lv);
+    }
+  }
+  // 还没露面的牌：总数 − 弃牌 − 明牌 − 我的手牌 − 我确知在别人手里的牌
+  const seen = {}, add = v => { seen[v] = (seen[v] || 0) + 1; };
+  for (const q of sim.order) sim.S[q].disc.forEach(add); sim.faceUp.forEach(add); me.hand.forEach(add);
+  const others = sim.order.filter(q => q !== pid && !sim.S[q].out);
+  for (const q of others) if (me.know[q] != null) add(me.know[q]);
+  const R = {};
+  for (const q of others) {
+    const d = {}; let sum = 0;
+    if (me.know[q] != null) { d[me.know[q]] = 1; R[q] = d; continue; }
+    const c = cons[q];
+    for (const v of vals) { let w = Math.max(0, sim.countOf(v) - (seen[v] || 0)); if (c.not[v] || v <= c.gt || v >= c.lt) w = 0; if (c.royal && (v === K.PRINCE || v === K.KING || v === K.PRINCESS)) w *= 4; d[v] = w; sum += w; }
+    if (!sum) { for (const v of vals) { d[v] = Math.max(0, sim.countOf(v) - (seen[v] || 0)) || .01; sum += d[v]; } }
+    for (const v of vals) d[v] /= sum; R[q] = d;
+  }
+  return R;
+}
 function botDecide(sim, pid, salt) {
   if (sim.cur() !== pid) return null;
   const s = sim.S[pid], hand = s.hand.slice(), rnd = k => h2(sim.n, salt * 31 + k, sim.cfg.seed ^ hstr(pid));
   const TOP = K.PRINCESS;
-  if (sim.phase === "chancellor") { const keep = hand.includes(TOP) ? TOP : Math.max(...hand); return { type: "keep", a: { card: keep } }; }
+  if (sim.phase === "chancellor") { return { type: "keep", a: { card: hand.includes(TOP) ? TOP : Math.max(...hand) } }; }
   if (sim.phase !== "play") return null;
   const must = sim.mustPlay(hand); if (must) return { type: "play", a: { card: must } };
-  // 已经公开的牌：所有弃牌 + 两人局明牌 + 自己手里的
-  const seen = {}; for (const q of sim.order) for (const v of sim.S[q].disc) seen[v] = (seen[v] || 0) + 1; for (const v of sim.faceUp) seen[v] = (seen[v] || 0) + 1; for (const v of hand) seen[v] = (seen[v] || 0) + 1;
-  const left = v => sim.countOf(v) - (seen[v] || 0);
-  const pick = (arr, k) => arr[Math.floor(rnd(k) * arr.length)];
-  const other = v => hand.find(x => x !== v);
-  // 电脑故意不太聪明：四成时候随手出一张（只保证不打公主），记住的手牌也只有一半时候会用上
-  const careless = rnd(40) < .4, useMemory = rnd(41) < .5;
-  // 决定打哪张：绝不打公主；皇后能留就留；小牌优先打
-  let card = hand.includes(TOP) ? hand.find(v => v !== TOP) : hand.slice().sort((a, b) => a - b)[0];
-  if (careless) { const ok = hand.filter(v => v !== TOP); card = ok.length ? pick(ok, 42) : card; }
-  else {
-    if (hand.includes(K.QUEEN) && hand.some(v => v <= K.BARON)) card = hand.find(v => v <= K.BARON);
-    // 侯爷：只有自己另一张够大才比
-    const ob = other(K.BARON); if (card === K.BARON && ob != null && ob < K.WANG) card = ob;
-    // 亲王：自己另一张是大牌时比了会输，改打另一张（公主除外，那就只能硬着头皮打）
-    const ow = other(K.WANG); if (card === K.WANG && ow != null && ow >= K.PRINCE && ow !== TOP) card = ow;
-    // 国公：手里另一张很小时值得换换
-    const od = other(K.DUKE); if (hand.includes(K.DUKE) && od != null && od <= K.BARON && sim.deck.length >= 2) card = K.DUKE;
-  }
-  const ts = sim.targets(pid, card);
-  const a = { card };
-  if (CARDS[card].tgt !== "none" && ts.length) {
-    const known = useMemory ? ts.filter(q => q !== pid && s.know[q] != null) : [], o = other(card);
-    if (card === K.GUARD) { const kq = known.find(q => s.know[q] !== K.GUARD); if (kq) { a.target = kq; a.guess = s.know[kq]; } else { a.target = pick(ts, 1); const gs = sim.guessable(); let best = gs[0], bl = -1; for (const v of gs) if (left(v) > bl) { bl = left(v); best = v; } a.guess = careless || rnd(2) < .6 ? pick(gs, 3) : best; } }
-    else if (card === K.BARON) { const kq = known.find(q => s.know[q] < o); a.target = kq || pick(ts, 4); }
-    else if (card === K.WANG) { const kq = known.find(q => s.know[q] > o); a.target = kq || pick(ts, 9); }
-    else if (card === K.PRINCE) { const kq = known.find(q => s.know[q] === TOP); a.target = kq || (o <= K.PRIEST && ts.includes(pid) && rnd(5) < .3 ? pid : pick(ts.filter(q => q !== pid).length ? ts.filter(q => q !== pid) : ts, 6)); }
-    else if (card === K.KING) { const kq = known.find(q => s.know[q] > o); a.target = kq || pick(ts, 7); }
-    else a.target = pick(ts, 8);
-  }
+  const R = botRead(sim, pid), nAlive = sim.alive().length;
+  const late = 1 - Math.min(1, sim.deck.length / (nAlive * 2.5)); // 0 = 还早，1 = 马上亮牌比大小
+  const lead = q => 1 + .25 * sim.P[q].tokens + (sim.P[q].tokens >= sim.need - 1 ? .5 : 0); // 快赢的人优先打
+  const P = (q, f) => { let x = 0; for (const v in R[q]) if (f(+v)) x += R[q][v]; return x; };
+  const sure = q => Math.max(...Object.values(R[q])); // 这个人暴露了多少：最可能那张牌的把握
+  let best = null;
+  const consider = (card, i) => {
+    if (card === TOP) return;
+    const keep = hand[1 - i], ts = sim.targets(pid, card), foes = ts.filter(q => q !== pid), a = { card };
+    // 留在手里的那张值多少：越到后面越要留大牌；公主、大牌怕被侍卫点名，早期略扣分
+    let val = keep * (.25 + .9 * late) - (keep >= K.PRINCE ? (1 - late) * .8 : 0), act = 0;
+    const top = (score) => { let bq = null, bs = -1e9; foes.forEach((q, j) => { const x = score(q) + rnd(50 + j) * .05; if (x > bs) { bs = x; bq = q; } }); return [bq, bs]; };
+    if (CARDS[card].tgt !== "none" && !foes.length) { act = .4; if (ts.includes(pid)) { a.target = pid; act = keep === TOP ? -100 : -keep * .5; } } // 都被保护：白打一张，没坏处
+    else if (card === K.GUARD) { // 猜最有把握的那个人、最可能的那张牌
+      let bs = -1; foes.forEach((q, j) => { for (const v of sim.guessable()) { const x = (R[q][v] || 0) * lead(q) + rnd(60 + j * 11 + v) * .02; if (x > bs) { bs = x; a.target = q; a.guess = v; } } });
+      act = 6 * (R[a.target][a.guess] || 0) + .6;
+    }
+    else if (card === K.PRIEST) { const [q] = top(q => (s.know[q] != null ? -5 : 0) + lead(q) - sure(q)); a.target = q; act = s.know[q] != null ? .2 : 1.6; }
+    else if (card === K.BARON || card === K.WANG) { const low = card === K.BARON; // 侯爷要对方比我小，亲王要对方比我大
+      const [q, x] = top(q => (P(q, v => low ? v < keep : v > keep) - 1.3 * P(q, v => low ? v > keep : v < keep)) * lead(q)); a.target = q; act = 6 * x / lead(q) + (x < 0 ? -1 : 0); }
+    else if (card === K.MAID) act = 1.8 + (keep >= K.PRINCE ? 1.5 : 0) + (keep === TOP ? 1.5 : 0);
+    else if (card === K.PRINCE) { // 逼最可能拿公主的人弃牌；否则逼牌大的、快赢的人
+      const [q, x] = top(q => (P(q, v => v === TOP) * 8 + P(q, v => v >= K.PRINCE) * 1.5 * (.4 + late)) * lead(q)); a.target = q; act = x / lead(q) + .8;
+      if (ts.includes(pid) && keep <= K.MAID && late < .6 && act < 1.6) { a.target = pid; act = 1.2; } }
+    else if (card === K.DUKE) act = sim.deck.length >= 2 ? 2.2 + (keep <= K.BARON ? 1.6 : 0) : .3;
+    else if (card === K.KING) { const ev = q => { let e = 0; for (const v in R[q]) e += v * R[q][v]; return e; };
+      const [q, x] = top(q => ev(q) - keep); a.target = q; act = x * (.3 + .7 * late) - .8; val = 0; } // 换完后对方知道我的牌
+    else if (card === K.SPY) act = 1.5;
+    else if (card === K.QUEEN) act = .2;
+    const sc = val + act + rnd(70 + i) * .1;
+    if (!best || sc > best.sc) best = { sc, a };
+  };
+  consider(hand[0], 0); if (hand[1] !== hand[0] || !best) consider(hand[1], 1);
+  if (!best) best = { a: { card: hand[0] } };
+  const a = best.a, ts = sim.targets(pid, a.card);
+  if (CARDS[a.card].tgt !== "none" && ts.length && a.target == null) a.target = ts[0];
   return { type: "play", a };
 }
 
-root.QS = { Sim, CARDS, K, TOKENS, COLORS, deckFor, countOf, botDecide, hstr, h2, mulberry };
+root.QS = { Sim, CARDS, K, botRead, TOKENS, COLORS, deckFor, countOf, botDecide, hstr, h2, mulberry };
 })(typeof window !== "undefined" ? window : globalThis);
