@@ -5,7 +5,7 @@ const $ = s => document.querySelector(s);
 const el = h => { const t = document.createElement("template"); t.innerHTML = h.trim(); return t.content.firstElementChild; };
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 let ONLINE = null, LOCAL = new QSNet.LocalNet(), NET = null, G = null;
-const VERSION = "情书 v16 · 电脑变聪明"; // 每次更新改一下，方便在手机上确认是不是新版
+const VERSION = "情书 v17 · 比牌对决"; // 每次更新改一下，方便在手机上确认是不是新版
 for (const id of ["verA", "verH"]) { const e = document.getElementById(id); if (e) e.textContent = VERSION; }
 const show = id => document.querySelectorAll(".screen").forEach(s => s.hidden = s.id !== id);
 function toast(text, kind = "") { const box = $("#toasts"); const t = el(`<div class="toast ${kind}"></div>`); t.textContent = text; box.prepend(t); while (box.children.length > 3) box.lastChild.remove(); setTimeout(() => t.remove(), 3800); }
@@ -201,11 +201,36 @@ async function playFx(f) {
     await sleep(400);
     const se = seatEl(f.t); if (se) { se.classList.add("hit"); setTimeout(() => se.classList.remove("hit"), 600); }
   }
+  // 2.5 侯爷 / 亲王：两张牌摆到中间对比。只有比牌的两个人看得到牌面，其他人只看到牌背和结果
+  const duel = (f.card === K.BARON || f.card === K.WANG) && f.t != null && f.secret;
+  if (duel) {
+    const see = f.by === me || f.t === me, vals = { [f.by]: f.secret[f.t], [f.t]: f.secret[f.by] }, lose = (f.knocked || [])[0], w = 96, h = 140, gap = 22;
+    big.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 220, fill: "forwards" }); cap.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 220, fill: "forwards" });
+    const rule = el(`<div class="cap">${esc(CARDS[f.card].name)}比牌 · <i>${f.card === K.BARON ? "小的出局" : "大的出局"}</i></div>`); rule.style.top = cy - h / 2 - 46 + "px"; layer.append(rule);
+    const vs = el(`<div class="vs">VS</div>`); vs.style.left = cx + "px"; vs.style.top = cy + "px"; layer.append(vs);
+    const els = {};
+    [f.by, f.t].forEach((q, i) => {
+      const c = el(`<div class="big sd duel">${backHTML()}<div class="who"><i style="background:${G.sim.P[q].color}"></i>${esc(q === me ? "我" : G.sim.P[q].name)}</div></div>`); layer.append(c); els[q] = c;
+      const fp = posOf(q), tx = cx + (i ? gap : -gap - w), ty = cy - h / 2;
+      c.animate([{ transform: `translate(${fp.x - w / 2}px,${fp.y - h / 2}px) scale(.4)`, opacity: .2 }, { transform: `translate(${tx}px,${ty}px) scale(1)`, opacity: 1 }], { duration: 420, delay: i * 120, easing: "cubic-bezier(.2,.8,.3,1)", fill: "forwards" });
+    });
+    AU("play", "play"); await sleep(760);
+    if (see) for (const q of [f.by, f.t]) { // 翻牌：先压扁，换成牌面，再展开
+      const cd = els[q].querySelector(".card"); await cd.animate([{ transform: "scaleX(1)" }, { transform: "scaleX(0)" }], { duration: 150, fill: "forwards" }).finished;
+      const nw = el(cardHTML(vals[q])); cd.replaceWith(nw); nw.animate([{ transform: "scaleX(0)" }, { transform: "scaleX(1)" }], { duration: 170, fill: "forwards" }); AU("play", "tap"); await sleep(260);
+    }
+    await sleep(see ? 350 : 500);
+    for (const q of [f.by, f.t]) { const tag = el(`<div class="tag ${lose === q ? "bad" : ""}">${!lose ? "平手" : lose === q ? "✖ 出局" : "胜"}</div>`); els[q].append(tag); if (lose) els[q].classList.add(lose === q ? "lose" : "win"); }
+    AU("play", lose ? (lose === me ? "lose" : "hit") : "tap");
+    await sleep(see ? 1900 : 1300);
+    for (const r of [rule, vs, els[f.by], els[f.t]]) r.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 260, fill: "forwards" });
+    await sleep(280);
+  }
   // 3. 结果
   const at = f.t != null ? posOf(f.t) : from, res = [];
   const put = (html, cls, dy = 0, where = at) => { const r = el(`<div class="res ${cls}">${html}</div>`); r.style.left = Math.max(96, Math.min(innerWidth - 96, where.x)) + "px"; r.style.top = Math.max(70, where.y - 34 + dy) + "px"; layer.append(r); r.animate([{ opacity: 0, transform: "translate(-50%,-30%) scale(.6)" }, { opacity: 1, transform: "translate(-50%,-50%) scale(1)" }], { duration: 260, easing: "cubic-bezier(.2,.8,.3,1.3)", fill: "forwards" }); res.push(r); return r; };
   if (f.guess != null) put(`猜「${CARDS[f.guess].name}」${f.hit ? "" : " · 没猜中"}`, f.hit ? "good" : "");
-  if (f.secret && f.secret[me] != null && (f.by === me || f.t === me)) { const v = f.secret[me]; put(`${f.card === K.KING ? "换到" : (f.card === K.BARON || f.card === K.WANG) ? "对方是" : "看到"} ${cardHTML(v, "mini")}`, "good", f.guess != null ? -40 : 0, f.card === K.KING && f.t === me ? posOf(me) : (f.card === K.BARON || f.card === K.WANG) ? posOf(f.by === me ? f.t : f.by) : at); }
+  if (duel) {} else if (f.secret && f.secret[me] != null && (f.by === me || f.t === me)) { const v = f.secret[me]; put(`${f.card === K.KING ? "换到" : (f.card === K.BARON || f.card === K.WANG) ? "对方是" : "看到"} ${cardHTML(v, "mini")}`, "good", f.guess != null ? -40 : 0, f.card === K.KING && f.t === me ? posOf(me) : (f.card === K.BARON || f.card === K.WANG) ? posOf(f.by === me ? f.t : f.by) : at); }
   else if (f.note && f.card !== K.MAID && f.guess == null) put(esc(f.note), "", 0, f.t != null ? at : from);
   if (f.show != null && f.card === K.PRINCE) put(cardHTML(f.show, "mini"), "", 36);
   if (f.moved && f.moved[me]) for (const [q, v] of f.moved[me]) put(`你知道的 ${cardHTML(v, "mini")} 到了${esc(G.sim.P[q].name)}手里`, "good", 0, posOf(q));
@@ -216,7 +241,7 @@ async function playFx(f) {
   // 4. 收尾：牌缩回出牌人的弃牌堆，结果标签淡出
   const dp = f.by === me ? $("#me-disc") : document.querySelector(`.seat[data-p="${f.by}"] .dpile`); const dr = dp ? dp.getBoundingClientRect() : null;
   const tx = dr ? dr.left + dr.width / 2 : from.x, ty = dr ? dr.top + dr.height / 2 : from.y;
-  big.animate([{ transform: `translate(${cx - bw / 2}px,${cy - bh / 2}px) scale(1)`, opacity: 1 }, { transform: `translate(${tx - bw / 2}px,${ty - bh / 2}px) scale(.3)`, opacity: 0 }], { duration: 380, easing: "ease-in", fill: "forwards" });
+  if (!duel) big.animate([{ transform: `translate(${cx - bw / 2}px,${cy - bh / 2}px) scale(1)`, opacity: 1 }, { transform: `translate(${tx - bw / 2}px,${ty - bh / 2}px) scale(.3)`, opacity: 0 }], { duration: 380, easing: "ease-in", fill: "forwards" });
   for (const r of [cap, ...res, ...layer.querySelectorAll(".arrow,.ring")]) r.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 300, delay: 120, fill: "forwards" });
   await sleep(420); layer.innerHTML = "";
 }
