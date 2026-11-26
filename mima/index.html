@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>密语</title>
+<meta name="theme-color" content="#101216">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="密语">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="../icon-180.png">
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+/* 密语：朋友之间的文字加密器。纯本地运算（浏览器自带的 AES-GCM），不联网、不存密码。 */
+:root{--bg:#101216;--panel:#1F2228;--panel-2:#2A2E36;--text:#ECE4D2;--muted:#9A917F;--line:#4A4F5A;--brass:#D9A93A;--seal:#B8352A;--good:#6FCF8A;--bad:#E0604F;
+  --display:"Noto Serif SC","Songti SC","STSong",serif;--body:-apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Noto Sans SC","Microsoft YaHei",system-ui,sans-serif;
+  --st:env(safe-area-inset-top,0px);--sb:env(safe-area-inset-bottom,0px);color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg)}
+body{color:var(--text);font-family:var(--body);font-size:15px;line-height:1.5;-webkit-text-size-adjust:100%;-webkit-tap-highlight-color:transparent;background:radial-gradient(130% 70% at 50% 0%,#2E323B 0%,var(--bg) 60%)}
+.wrap{max-width:560px;margin:0 auto;padding:calc(var(--st) + 18px) max(16px,env(safe-area-inset-left,0px)) calc(var(--sb) + 40px) max(16px,env(safe-area-inset-right,0px))}
+header{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+header a{color:var(--muted);text-decoration:none;font-size:14px;border:1px solid var(--line);border-radius:4px;padding:4px 10px}
+header h1{margin:0;font-family:var(--display);font-weight:900;font-size:28px;letter-spacing:.15em}
+header .seal{margin-left:auto;background:var(--seal);color:#FFF1E0;font-family:var(--display);font-weight:900;font-size:13px;padding:4px 7px;border-radius:3px;letter-spacing:.15em}
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:14px}
+.tabs button{background:var(--panel);color:var(--muted);border:0;padding:12px 0;font-size:17px;font-family:var(--display);font-weight:700;letter-spacing:.2em}
+.tabs button.on{background:var(--brass);color:#1A1408}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:12px}
+label{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
+textarea,input{width:100%;background:#15171B;color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:16px;font-family:var(--body);outline:none}
+textarea:focus,input:focus{border-color:var(--brass)}
+textarea{min-height:110px;resize:vertical;line-height:1.55}
+.pw{position:relative}.pw input{padding-right:62px}
+.pw button{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:transparent;color:var(--muted);border:0;font-size:13px;padding:6px 8px}
+.row{display:flex;gap:8px;margin-top:10px}
+.big{flex:1;background:var(--brass);color:#1A1408;border:0;border-radius:8px;padding:13px 0;font-size:17px;font-weight:800;font-family:var(--display);letter-spacing:.15em}
+.big:active{transform:translateY(1px)}
+.ghost{background:var(--panel-2);color:var(--text);border:1px solid var(--line);border-radius:8px;padding:10px 14px;font-size:15px}
+.styles{display:flex;flex-wrap:wrap;gap:6px}
+.styles button{background:var(--panel-2);color:var(--text);border:1px solid var(--line);border-radius:16px;padding:5px 12px;font-size:14px}
+.styles button i{font-style:normal;color:var(--muted);margin-left:4px;font-size:12px}
+.styles button.on{border-color:var(--brass);color:var(--brass);box-shadow:0 0 0 1px var(--brass) inset}
+.out{word-break:break-all;white-space:pre-wrap;background:#15171B;border:1px dashed var(--brass);border-radius:8px;padding:12px;font-size:17px;line-height:1.6;min-height:60px;user-select:all;-webkit-user-select:all}
+.plain{white-space:pre-wrap;word-break:break-word;background:#15171B;border:1px solid var(--good);border-radius:8px;padding:12px;font-size:17px;min-height:50px;user-select:text;-webkit-user-select:text}
+.msg{font-size:14px;margin-top:8px;min-height:20px}.msg.bad{color:var(--bad)}.msg.good{color:var(--good)}
+.note{font-size:13px;color:var(--muted);margin:6px 0 0}
+.hid{display:none}
+details{color:var(--muted);font-size:14px}details summary{color:var(--text);cursor:pointer;padding:4px 0}
+details p{margin:6px 0}
+.ver{text-align:center;color:var(--muted);font-size:12px;margin-top:18px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header><a href="../">← 大厅</a><h1>密语</h1><span class="seal">密</span></header>
+
+  <div class="tabs"><button id="tEnc" class="on">加 密</button><button id="tDec">解 密</button></div>
+
+  <!-- 加密 -->
+  <section id="pEnc">
+    <div class="card">
+      <label for="eText">要说的话</label>
+      <textarea id="eText" placeholder="在这里输入要加密的话……"></textarea>
+      <label for="ePw" style="margin-top:12px">密码（和朋友事先约好）</label>
+      <div class="pw"><input id="ePw" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="输入密码"><button type="button" data-eye="ePw">显示</button></div>
+      <label style="margin-top:12px">变成什么样子</label>
+      <div class="styles" id="styles"></div>
+      <div class="row"><button class="big" id="bEnc">加 密</button></div>
+      <div class="msg" id="eMsg"></div>
+    </div>
+    <div class="card hid" id="eOutBox">
+      <label>密文（整段复制发给朋友）</label>
+      <div class="out" id="eOut"></div>
+      <div class="row"><button class="big" id="bCopy">复 制</button><button class="ghost" id="bShare">分享…</button></div>
+      <div class="msg" id="cMsg"></div>
+    </div>
+  </section>
+
+  <!-- 解密 -->
+  <section id="pDec" class="hid">
+    <div class="card">
+      <label for="dText">收到的密文</label>
+      <textarea id="dText" placeholder="把朋友发来的密文整段粘贴到这里"></textarea>
+      <div class="row" style="margin-top:6px"><button class="ghost" id="bPaste">从剪贴板粘贴</button><button class="ghost" id="bClear">清空</button></div>
+      <label for="dPw" style="margin-top:12px">密码</label>
+      <div class="pw"><input id="dPw" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="输入约好的密码"><button type="button" data-eye="dPw">显示</button></div>
+      <div class="row"><button class="big" id="bDec">解 密</button></div>
+      <div class="msg" id="dMsg"></div>
+    </div>
+    <div class="card hid" id="dOutBox">
+      <label>原文</label>
+      <div class="plain" id="dOut"></div>
+      <div class="row"><button class="ghost" id="bCopyPlain">复制原文</button></div>
+    </div>
+  </section>
+
+  <details class="card">
+    <summary>怎么用？安全吗？</summary>
+    <p><b>发消息：</b>写好话 → 输入密码 → 点「加密」→ 点「复制」→ 到微信里粘贴发出去。</p>
+    <p><b>收消息：</b>长按复制朋友发来的那一整段 → 打开这页点「解密」→ 粘贴 → 输入同一个密码 → 点「解密」。</p>
+    <p><b>密码</b>要当面或电话约好，别和密文发在同一个聊天里。密码错一个字都解不开；没有密码，谁也解不开（包括做这个页面的人）。</p>
+    <p>同一句话每次加密出来都不一样，这是正常的，别人没法靠"对比"猜内容。密文里多了空格、换行也不要紧，解密时会自动去掉。</p>
+    <p>所有运算都在你自己手机上完成，不联网、不保存你的话和密码。</p>
+  </details>
+  <div class="ver" id="ver"></div>
+</div>
+
+<script>
+"use strict";
+const VERSION = "密语 v1";
+document.getElementById("ver").textContent = VERSION;
+const $ = s => document.querySelector(s);
+
+/* ---------- 密文的几种"长相"：每种是一张字表，长度 64（每字 6 位）或 256（每字 8 位）。几张表互不重叠，解密时自动认出是哪种 ---------- */
+const range = (a, n) => Array.from({ length: n }, (_, i) => String.fromCodePoint(a + i));
+const STYLES = [
+  { id: "sym", name: "符号", eg: "∀∂∑≈", chars: range(0x2200, 256) },                       // 数学符号区，256 个
+  { id: "han", name: "汉字", eg: "丁七丈", chars: range(0x4E00, 256) },                     // 常见汉字区，256 个
+  { id: "gua", name: "卦象", eg: "䷀䷁䷂", chars: range(0x4DC0, 64) },                       // 六十四卦
+  { id: "abc", name: "字母数字", eg: "aZ3k", chars: [..."ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"] }
+];
+for (const S of STYLES) { S.bits = Math.log2(S.chars.length); S.map = new Map(S.chars.map((c, i) => [c, i])); }
+
+function toText(bytes, S) { // 字节 → 字符：按位切片
+  let out = "", acc = 0, n = 0;
+  for (const b of bytes) { acc = (acc << 8) | b; n += 8; while (n >= S.bits) { n -= S.bits; out += S.chars[(acc >> n) & (S.chars.length - 1)]; } acc &= (1 << n) - 1; }
+  if (n) out += S.chars[(acc << (S.bits - n)) & (S.chars.length - 1)];
+  return out;
+}
+function fromText(chars, S) { // 字符 → 字节
+  const out = []; let acc = 0, n = 0;
+  for (const c of chars) { acc = (acc << S.bits) | S.map.get(c); n += S.bits; if (n >= 8) { n -= 8; out.push((acc >> n) & 255); } acc &= (1 << n) - 1; }
+  return new Uint8Array(out);
+}
+function detect(str) { // 看哪张字表认识的字最多
+  const cs = [...str]; let best = null, bc = 0;
+  for (const S of STYLES) { const k = cs.filter(c => S.map.has(c)).length; if (k > bc) { bc = k; best = S; } }
+  return best ? { S: best, chars: cs.filter(c => best.map.has(c)) } : null;
+}
+
+/* ---------- 加密本体：密码 → PBKDF2 派生 AES-256 密钥，AES-GCM 加密（自带防篡改校验，密码错了会直接失败） ---------- */
+const ITER = 150000, enc = new TextEncoder(), dec = new TextDecoder();
+async function keyFrom(pw, salt) {
+  const base = await crypto.subtle.importKey("raw", enc.encode(pw), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations: ITER, hash: "SHA-256" }, base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+}
+// 格式：版本(1) + 盐(8) + 随机数(12) + 密文和校验
+async function seal(text, pw) {
+  const salt = crypto.getRandomValues(new Uint8Array(8)), iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await keyFrom(pw, salt), enc.encode(text)));
+  const all = new Uint8Array(21 + ct.length); all[0] = 1; all.set(salt, 1); all.set(iv, 9); all.set(ct, 21); return all;
+}
+async function unseal(bytes, pw) {
+  if (bytes.length < 21 + 16 || bytes[0] !== 1) throw new Error("bad");
+  const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: bytes.slice(9, 21) }, await keyFrom(pw, bytes.slice(1, 9)), bytes.slice(21));
+  return dec.decode(pt);
+}
+
+/* ---------- 界面 ---------- */
+let style = "sym"; try { style = localStorage.getItem("mima.style") || style; } catch {}
+function drawStyles() {
+  $("#styles").innerHTML = STYLES.map(S => `<button data-s="${S.id}" class="${S.id === style ? "on" : ""}">${S.name}<i>${S.eg}</i></button>`).join("");
+}
+drawStyles();
+$("#styles").onclick = e => { const b = e.target.closest("button"); if (!b) return; style = b.dataset.s; try { localStorage.setItem("mima.style", style); } catch {} drawStyles(); if (lastBytes) $("#eOut").textContent = toText(lastBytes, STYLES.find(S => S.id === style)); };
+document.querySelectorAll("[data-eye]").forEach(b => b.onclick = () => { const i = document.getElementById(b.dataset.eye); i.type = i.type === "password" ? "text" : "password"; b.textContent = i.type === "password" ? "显示" : "隐藏"; });
+const tab = d => { $("#tEnc").classList.toggle("on", !d); $("#tDec").classList.toggle("on", d); $("#pEnc").classList.toggle("hid", d); $("#pDec").classList.toggle("hid", !d); };
+$("#tEnc").onclick = () => tab(false); $("#tDec").onclick = () => tab(true);
+const say = (id, t, k = "") => { const m = $(id); m.textContent = t; m.className = "msg " + k; };
+
+if (!(window.crypto && crypto.subtle)) { say("#eMsg", "这个浏览器不支持加密功能，请用 Safari 或 Chrome 打开。", "bad"); }
+
+let lastBytes = null;
+$("#bEnc").onclick = async () => {
+  const text = $("#eText").value, pw = $("#ePw").value;
+  if (!text.trim()) return say("#eMsg", "先写要说的话", "bad");
+  if (!pw) return say("#eMsg", "先输入密码", "bad");
+  say("#eMsg", "加密中…");
+  try {
+    lastBytes = await seal(text, pw);
+    $("#eOut").textContent = toText(lastBytes, STYLES.find(S => S.id === style));
+    $("#eOutBox").classList.remove("hid"); say("#eMsg", "加密好了，在下面复制", "good"); say("#cMsg", "");
+    $("#eOutBox").scrollIntoView({ behavior: "smooth", block: "nearest" });
+  } catch (e) { say("#eMsg", "加密失败：" + e.message, "bad"); }
+};
+async function copy(text, msgId) {
+  try { await navigator.clipboard.writeText(text); say(msgId, "已复制，去聊天里粘贴吧", "good"); }
+  catch { const r = document.createRange(); r.selectNodeContents($("#eOut")); const s = getSelection(); s.removeAllRanges(); s.addRange(r); say(msgId, "已选中，请长按选「拷贝」", ""); }
+}
+$("#bCopy").onclick = () => copy($("#eOut").textContent, "#cMsg");
+$("#bShare").onclick = async () => { if (navigator.share) { try { await navigator.share({ text: $("#eOut").textContent }); } catch {} } else copy($("#eOut").textContent, "#cMsg"); };
+
+$("#bPaste").onclick = async () => { try { $("#dText").value = await navigator.clipboard.readText(); say("#dMsg", ""); } catch { say("#dMsg", "没能读到剪贴板，请长按输入框选「粘贴」", "bad"); } };
+$("#bClear").onclick = () => { $("#dText").value = ""; $("#dOutBox").classList.add("hid"); say("#dMsg", ""); };
+$("#bDec").onclick = async () => {
+  const raw = $("#dText").value, pw = $("#dPw").value;
+  $("#dOutBox").classList.add("hid");
+  if (!raw.trim()) return say("#dMsg", "先粘贴收到的密文", "bad");
+  if (!pw) return say("#dMsg", "先输入密码", "bad");
+  const got = detect(raw);
+  if (!got || got.chars.length < 40) return say("#dMsg", "这段看起来不是密语生成的密文，或者没复制完整", "bad");
+  say("#dMsg", "解密中…");
+  try {
+    const text = await unseal(fromText(got.chars, got.S), pw);
+    $("#dOut").textContent = text; $("#dOutBox").classList.remove("hid"); say("#dMsg", "解开了", "good");
+  } catch { say("#dMsg", "解不开：密码不对，或者密文没复制完整", "bad"); }
+};
+$("#bCopyPlain").onclick = async () => { try { await navigator.clipboard.writeText($("#dOut").textContent); say("#dMsg", "原文已复制", "good"); } catch {} };
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+window.MIMA = { STYLES, toText, fromText, detect, seal, unseal }; // 给测试用
+</script>
+</body>
+</html>
